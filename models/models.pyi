@@ -2,6 +2,9 @@ import datetime
 from typing import Optional
 from peewee import Model, ModelSelect
 
+def init_db() -> None:
+    pass
+
 class User(Model):
     id: int
     """_id from telegram_"""
