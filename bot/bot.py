@@ -8,7 +8,7 @@ from telegram.ext import (
 )
 import re
 
-from config import config
+from bot.config import config
 from utils.log import log
 
 from commands.admin import addAdmin, removeAdmin

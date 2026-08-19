@@ -6,7 +6,7 @@ from datetime import datetime
 
 from utils.jsonUtils import fromJSONFile, toJSONFile
 
-from config import LOG_PATH, LOGQUEUE_PATH, config
+from bot.config import LOG_PATH, LOGQUEUE_PATH, config
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
