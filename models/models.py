@@ -1,8 +1,20 @@
-from peewee import SqliteDatabase, Model, IntegerField, TextField, BooleanField
+from peewee import (
+    AutoField,
+    BigIntegerField,
+    DateField,
+    DateTimeField,
+    ForeignKeyField,
+    SmallIntegerField,
+    TextField,
+    BooleanField,
+    TimeField,
+    CompositeKey,
+    SqliteDatabase,
+    Model
+)
 from peewee_migrate import Router
 
-# Connettiamo al database SQLite
-db = SqliteDatabase('secret/Database.db')
+db = SqliteDatabase('secret/Database.db', pragmas={'foreign_keys': 1})
 router = Router(db, migrate_dir='migrations')
 
 def init_db():
@@ -13,11 +25,41 @@ class BaseModel(Model):
     class Meta:
         database = db
         
-class Utente(BaseModel):
-    id = IntegerField(primary_key=True)
-    username = TextField(null=True)
-    admin = BooleanField(default=False)
+class User(BaseModel):
+    id = BigIntegerField(primary_key = True) # tg id
+    username = TextField(null = True)
+    admin = BooleanField(default = False)
     
 class Chat(BaseModel):
-    id = IntegerField(primary_key=True)
-    title = TextField(null=True)
+    id = BigIntegerField(primary_key = True) # tg id
+    title = TextField(null = True)
+
+class EventSerie(BaseModel):
+    id = AutoField(primary_key = True)
+    chat = ForeignKeyField(Chat, backref = 'event_series')
+    title = TextField()
+    default_event_time = TimeField() 
+    default_remind_time = TimeField() 
+    day_of_week = SmallIntegerField() # 0 (Monday) --> 6 (Sunday)
+    start_date = DateField()
+    end_date = DateField()
+    is_active = BooleanField(default = True)
+
+class EventSerieSubscription(BaseModel):
+    event_serie = ForeignKeyField(EventSerie, backref = 'partecipanti', on_delete = 'CASCADE')
+    user = ForeignKeyField(User, backref = 'iscrizioni_eventi', on_delete = 'CASCADE')
+
+    class Meta:
+        primary_key = CompositeKey('event_serie', 'user')
+
+class ActualEvent(BaseModel):
+    event_serie = ForeignKeyField(EventSerie, on_delete = 'CASCADE')
+    event_datetime = DateTimeField()    
+    remind_datetime = DateTimeField()
+    status = TextField(default = 'PENDING')
+    note = TextField(null=True)
+
+    class Meta:
+        indexes = (
+            (('status', 'remind_datetime'), False), # that False is "is_unique" param
+        )

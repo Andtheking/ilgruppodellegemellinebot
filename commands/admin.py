@@ -2,7 +2,7 @@ from telegram import Message, Update
 from telegram.ext import ContextTypes
 
 from config import *
-from models.models import Utente
+from models.models import User
 from utils.answerMessage import rispondi
 from utils.log import log
 
@@ -26,7 +26,7 @@ async def getCandidate(message: Message, candidate: str):
     else:
         candidate_user = candidate
     
-    db_user: Utente = Utente.select().where((Utente.id == candidate_user) | (Utente.username == candidate_user)).get_or_none()
+    db_user: User = User.select().where((User.id == candidate_user) | (User.username == candidate_user)).get_or_none()
     
     if db_user is None:
         await rispondi(message, "Il bot non conosce l'utente in questione...")
@@ -39,7 +39,7 @@ async def addAdmin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.effective_message
     groups = context.match.groupdict()
     
-    db_user: Utente = await getCandidate(message, groups['candidate'])
+    db_user: User = await getCandidate(message, groups['candidate'])
 
     if not db_user.admin:
         db_user.admin = True
@@ -54,7 +54,7 @@ async def removeAdmin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.effective_message
     groups = context.match.groupdict()
     
-    db_user: Utente = await getCandidate(message, groups['candidate'])
+    db_user: User = await getCandidate(message, groups['candidate'])
 
     if db_user.admin:
         db_user.admin = False
@@ -65,5 +65,5 @@ async def removeAdmin(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await rispondi(message, f"L'utente {db_user.username} non è admin.")
 
 def isAdmin(user_id: int) -> bool:
-    db_user: Utente = Utente.get_by_id(user_id)
+    db_user: User = User.get_by_id(user_id)
     return db_user.admin

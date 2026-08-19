@@ -1,7 +1,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from models.models import Chat, Utente
+from models.models import Chat, User, EventSerie
 from utils.log import log
 
 def middleware(next = None):
@@ -11,9 +11,9 @@ def middleware(next = None):
         chat = message.chat
        
         if user is not None:
-            db_user: Utente = Utente.select().where(Utente.id == user.id).first()
+            db_user: User = User.select().where(User.id == user.id).first()
             if db_user is None:
-                db_user = Utente.create(id = user.id, username = user.name)
+                db_user = User.create(id = user.id, username = user.name)
                 log(f"Inserito nel DB il seguente utente: {user.name} ({user.id})", True)
             
             if db_user.username != user.name:
