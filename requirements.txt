@@ -16,7 +16,7 @@ pathspec==1.1.1
 peewee==4.3.0
 peewee-migrate==1.15.0
 pyrefly==1.2.0
-python-telegram-bot==22.8
+python-telegram-bot[job-queue]==22.8
 requests==2.34.2
 types-peewee==4.3.0.20260807
 typing_extensions==4.16.0

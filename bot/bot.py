@@ -34,7 +34,7 @@ def cancel(action: str):
 def message_handler_as_command(command, other=None, strict=True):
     return filters.Regex(re.compile(rf"^[!.\/]{command}(?P<botSignature>@{config.BOT_USERNAME})?{'( ' + other + ')?' if other is not None else ''}{'$' if strict else ''}",re.IGNORECASE))
 
-def main():
+def start_bot():
     application = Application.builder().token(config.TOKEN).build() 
 
     handlers = {
@@ -65,6 +65,3 @@ def main():
     )
     
     application.run_polling()
-    
-if __name__ == '__main__':
-    main()

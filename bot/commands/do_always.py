@@ -1,7 +1,7 @@
 from telegram import Update
 from telegram.ext import ContextTypes
 
-from models.models import Chat, User, EventSerie
+from models.models import Chat, User
 from utils.log import log
 
 def middleware(next = None):

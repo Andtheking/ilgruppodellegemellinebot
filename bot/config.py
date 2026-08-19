@@ -3,7 +3,6 @@ from dotenv import load_dotenv
 from requests import get
 from utils.json_utils import fromJSON
 
-
 load_dotenv()
 
 class Config:
