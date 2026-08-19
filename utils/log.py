@@ -6,7 +6,10 @@ from datetime import datetime
 
 from utils.jsonUtils import fromJSONFile, toJSONFile
 
-from bot.config import LOG_PATH, LOGQUEUE_PATH, config
+from bot.config import config
+
+LOG_PATH = './logs.txt'
+LOGQUEUE_PATH = './log_queue.json'
 
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
                     level=logging.INFO)
@@ -35,10 +38,8 @@ def log(message: str, send_with_bot:bool = False, tipo: str = "info", only_file=
         logQueue.append(f"#{tipo.upper()}\n" + messageForBot)
         toJSONFile(LOGQUEUE_PATH,logQueue)
         
-    m = 'a'
-    if not os.path.exists(LOG_PATH):
-        m='w'
-        
+    m = 'a' if os.path.exists(LOG_PATH) else 'w' 
+       
     with open(LOG_PATH,m, encoding="utf-8") as f:
         f.write(messageForFile)
     

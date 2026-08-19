@@ -11,10 +11,10 @@ import re
 from bot.config import config
 from utils.log import log
 
-from commands.admin import addAdmin, removeAdmin
-from commands.doAlways import middleware
-from jobs.initialize import initialize
-from jobs.send_logs import send_logs_channel
+from bot.commands.admin import addAdmin, removeAdmin
+from bot.commands.doAlways import middleware
+from bot.jobs.initialize import initialize
+from bot.jobs.send_logs import send_logs_channel
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f'Hai avviato il bot, congrats')

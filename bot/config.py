@@ -1,6 +1,5 @@
 import os
 from requests import get
-
 from utils.jsonUtils import fromJSON
 
 class Config:

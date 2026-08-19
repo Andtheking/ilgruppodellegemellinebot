@@ -3,7 +3,7 @@ from telegram.ext import ContextTypes
 
 from bot.config import *
 from models.models import User
-from utils.answerMessage import rispondi
+from bot.utils.answer_message import rispondi
 from utils.log import log
 
 def adminFunction(inner_function):
