@@ -8,7 +8,7 @@ from telegram.ext import (
 )
 import re
 
-from bot.config import config
+from bot.bot_config import bot_config
 from utils.log import log
 
 from bot.commands.admin import add_admin, remove_admin
@@ -32,10 +32,10 @@ def cancel(action: str):
     return thing
 
 def message_handler_as_command(command, other=None, strict=True):
-    return filters.Regex(re.compile(rf"^[!.\/]{command}(?P<botSignature>@{config.BOT_USERNAME})?{'( ' + other + ')?' if other is not None else ''}{'$' if strict else ''}",re.IGNORECASE))
+    return filters.Regex(re.compile(rf"^[!.\/]{command}(?P<botSignature>@{bot_config.BOT_USERNAME})?{'( ' + other + ')?' if other is not None else ''}{'$' if strict else ''}",re.IGNORECASE))
 
 def start_bot():
-    application = Application.builder().token(config.TOKEN).build() 
+    application = Application.builder().token(bot_config.TOKEN).build() 
 
     handlers = {
         "start": MessageHandler(message_handler_as_command('start'),middleware(start)),
@@ -53,7 +53,7 @@ def start_bot():
     
     jq = application.job_queue
 
-    if (config.CANALE_LOG):
+    if (bot_config.CANALE_LOG):
         jq.run_repeating(
             callback=send_logs_channel,
             interval=60

@@ -1,7 +1,7 @@
 from telegram import Message, Update
 from telegram.ext import ContextTypes
 
-from bot.config import *
+from bot.bot_config import *
 from models.models import User
 from bot.utils.answer_message import rispondi
 from utils.log import log

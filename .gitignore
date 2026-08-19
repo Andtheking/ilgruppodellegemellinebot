@@ -1,4 +1,10 @@
-__pycache__
-secret/*
+# Folders
+__pycache__/
+secret/
+.vscode/
+
+# Files
 .env
 .mypy_cache
+log_queue.json
+logs.txt

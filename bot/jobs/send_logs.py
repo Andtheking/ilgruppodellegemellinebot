@@ -1,8 +1,5 @@
-if __name__ == '__main__':
-    pass    
-else:
-    from utils.json_utils import load_configs, fromJSONFile, toJSONFile
-
+from utils.json_utils import load_configs, fromJSONFile, toJSONFile
+from utils.log import LOGQUEUE_PATH
 
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
@@ -10,7 +7,7 @@ from telegram.ext import ContextTypes
 from asyncio import sleep
 
 async def send_logs_channel(context: ContextTypes.DEFAULT_TYPE):
-    logQueue = fromJSONFile('logQueue.json')
+    logQueue = fromJSONFile(LOGQUEUE_PATH)
     
     if len(logQueue) == 0:
         return
@@ -36,9 +33,9 @@ async def send_logs_channel(context: ContextTypes.DEFAULT_TYPE):
     while len(mex) > 0:
         too_long = mex[0:4095] # Diviso per massimo di telegram
         await context.bot.send_message(load_configs()["canale_log"], too_long, parse_mode=ParseMode.HTML)
-        mex = mex[4095:]
-        await sleep(5)
+        mex = mex[4095:] # telegram limit
+        await sleep(5) # telegram limit
     
     # Svuota la coda e salva su file
-    toJSONFile('logQueue.json', [])
+    toJSONFile(LOGQUEUE_PATH, [])
 
