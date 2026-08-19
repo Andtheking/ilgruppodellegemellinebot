@@ -15,7 +15,7 @@ from peewee import (
 from peewee_migrate import Router
 
 db = SqliteDatabase('secret/Database.db', pragmas={'foreign_keys': 1})
-router = Router(db, migrate_dir='migrations')
+router = Router(db, migrate_dir='models/migrations')
 
 def init_db():
     """_Initialize database and apply migrations_"""

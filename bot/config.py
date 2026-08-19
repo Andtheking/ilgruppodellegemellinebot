@@ -1,6 +1,10 @@
 import os
+from dotenv import load_dotenv
 from requests import get
 from utils.jsonUtils import fromJSON
+
+
+load_dotenv()
 
 class Config:
     def __init__(self):
