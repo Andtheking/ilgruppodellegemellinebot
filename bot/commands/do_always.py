@@ -5,7 +5,7 @@ from models.models import Chat, User, EventSerie
 from utils.log import log
 
 def middleware(next = None):
-    async def doAlways(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def do_always(update: Update, context: ContextTypes.DEFAULT_TYPE):
         user = update.effective_user
         message = update.effective_message
         chat = message.chat
@@ -35,4 +35,4 @@ def middleware(next = None):
         
         if next != None:
             await next(update, context)
-    return doAlways
+    return do_always

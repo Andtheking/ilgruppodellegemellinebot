@@ -11,8 +11,8 @@ import re
 from bot.config import config
 from utils.log import log
 
-from bot.commands.admin import addAdmin, removeAdmin
-from bot.commands.doAlways import middleware
+from bot.commands.admin import add_admin, remove_admin
+from bot.commands.do_always import middleware
 from bot.jobs.initialize import initialize
 from bot.jobs.send_logs import send_logs_channel
 
@@ -40,8 +40,8 @@ def main():
     handlers = {
         "start": MessageHandler(message_handler_as_command('start'),middleware(start)),
         "help": MessageHandler(message_handler_as_command('help'),middleware(help)),
-        "addAdmin": MessageHandler(message_handler_as_command('addAdmin','(?P<candidate>.+)?'), middleware(addAdmin)),
-        "removeAdmin": MessageHandler(message_handler_as_command('removeAdmin','(?P<candidate>.+)?'), middleware(removeAdmin))
+        "addAdmin": MessageHandler(message_handler_as_command('addAdmin','(?P<candidate>.+)?'), middleware(add_admin)),
+        "removeAdmin": MessageHandler(message_handler_as_command('removeAdmin','(?P<candidate>.+)?'), middleware(remove_admin))
     }
     
     for v in handlers.values():

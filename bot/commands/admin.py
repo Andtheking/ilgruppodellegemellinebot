@@ -6,18 +6,18 @@ from models.models import User
 from bot.utils.answer_message import rispondi
 from utils.log import log
 
-def adminFunction(inner_function):
+def admin_function(inner_function):
     """
     Meant to be used as decorator
     """
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if not isAdmin(update.effective_user.id):
+        if not is_admin(update.effective_user.id):
             await rispondi(update.effective_message, "Non hai il permesso.")
             return
         return await inner_function(update, context)
     return wrapper
 
-async def getCandidate(message: Message, candidate: str):
+async def get_candidate(message: Message, candidate: str):
     if candidate is None and message.reply_to_message is None:
         return
     
@@ -34,12 +34,12 @@ async def getCandidate(message: Message, candidate: str):
     
     return db_user
 
-@adminFunction
-async def addAdmin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+@admin_function
+async def add_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.effective_message
     groups = context.match.groupdict()
     
-    db_user: User = await getCandidate(message, groups['candidate'])
+    db_user: User = await get_candidate(message, groups['candidate'])
 
     if not db_user.admin:
         db_user.admin = True
@@ -49,12 +49,12 @@ async def addAdmin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await rispondi(message, f"L'utente {db_user.username} è già admin.")
 
-@adminFunction
-async def removeAdmin(update: Update, context: ContextTypes.DEFAULT_TYPE):
+@admin_function
+async def remove_admin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     message = update.effective_message
     groups = context.match.groupdict()
     
-    db_user: User = await getCandidate(message, groups['candidate'])
+    db_user: User = await get_candidate(message, groups['candidate'])
 
     if db_user.admin:
         db_user.admin = False
@@ -64,6 +64,6 @@ async def removeAdmin(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         await rispondi(message, f"L'utente {db_user.username} non è admin.")
 
-def isAdmin(user_id: int) -> bool:
+def is_admin(user_id: int) -> bool:
     db_user: User = User.get_by_id(user_id)
     return db_user.admin

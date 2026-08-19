@@ -1,7 +1,7 @@
 if __name__ == '__main__':
     pass    
 else:
-    from utils.jsonUtils import load_configs, fromJSONFile, toJSONFile
+    from utils.json_utils import load_configs, fromJSONFile, toJSONFile
 
 
 from telegram.constants import ParseMode

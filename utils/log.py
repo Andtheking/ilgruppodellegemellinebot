@@ -4,7 +4,7 @@ import inspect
 
 from datetime import datetime
 
-from utils.jsonUtils import fromJSONFile, toJSONFile
+from utils.json_utils import fromJSONFile, toJSONFile
 
 from bot.config import config
 
