@@ -18,7 +18,6 @@ db = SqliteDatabase('secret/Database.db', pragmas={'foreign_keys': 1})
 router = Router(db, migrate_dir='models/migrations')
 
 def init_db():
-    """_Initialize database and apply migrations_"""
     router.run()
 
 class BaseModel(Model):

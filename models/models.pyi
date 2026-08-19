@@ -1,8 +1,11 @@
 import datetime
 from typing import Optional
-from peewee import Model, ModelSelect
+from peewee import Database, Model, ModelSelect
+
+db: Database
 
 def init_db() -> None:
+    """_Initialize database and apply migrations_"""
     pass
 
 class User(Model):
