@@ -8,6 +8,7 @@ from telegram.ext import (
 )
 import re
 
+from bot.CustomCommandHandler import CustomCommandHandler
 from bot.bot_config import bot_config
 from utils.log import log
 
@@ -15,6 +16,9 @@ from bot.commands.admin import add_admin, remove_admin
 from bot.commands.do_always import middleware
 from bot.jobs.initialize import initialize
 from bot.jobs.send_logs import send_logs_channel
+
+from bot.commands.create_series import create_series_handler
+
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f'Hai avviato il bot, congrats')
@@ -38,10 +42,11 @@ def start_bot():
     application = Application.builder().token(bot_config.TOKEN).build() 
 
     handlers = {
-        "start": MessageHandler(message_handler_as_command('start'),middleware(start)),
-        "help": MessageHandler(message_handler_as_command('help'),middleware(help)),
-        "addAdmin": MessageHandler(message_handler_as_command('addAdmin','(?P<candidate>.+)?'), middleware(add_admin)),
-        "removeAdmin": MessageHandler(message_handler_as_command('removeAdmin','(?P<candidate>.+)?'), middleware(remove_admin))
+        "start": CustomCommandHandler('start', middleware(start)),
+        "help": CustomCommandHandler('help',middleware(help)),
+        "addAdmin": CustomCommandHandler('addAdmin', other='(?P<candidate>.+)?', callback=middleware(add_admin)),
+        "removeAdmin": CustomCommandHandler('removeAdmin', other='(?P<candidate>.+)?', callback=middleware(remove_admin)),
+        "createSeries": create_series_handler
     }
     
     for v in handlers.values():
