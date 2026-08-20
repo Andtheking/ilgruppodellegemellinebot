@@ -12,7 +12,8 @@ from telegram.ext import (
 from bot.CustomCommandHandler import CustomCommandHandler
 from bot.commands.do_always import middleware
 from models.models import Chat, EventSerie
-from services.event_manager import populate_rolling_events_for_series
+from services.actualevent_manager import populate_rolling_events_for_series
+from services.eventseries_manager import create_series_with_events
 
 # conversation steps
 (
@@ -168,7 +169,7 @@ async def set_end_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
     data = context.user_data["new_serie"]
 
-    serie = EventSerie.create(
+    serie, eventi_creati = create_series_with_events(
         chat_id=data["chat_id"],
         title=data["title"],
         default_event_time=data["event_time"],
@@ -178,8 +179,6 @@ async def set_end_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         end_date=end_date,
         is_active=True
     )
-
-    eventi_creati = populate_rolling_events_for_series(serie)
 
     context.user_data.clear()
 

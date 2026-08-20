@@ -4,7 +4,7 @@ import os
 from peewee import SqliteDatabase
 
 from models.models import User, Chat, EventSerie, EventSerieSubscription, ActualEvent
-from services.event_manager import populate_rolling_events_for_series, sync_all_active_series
+from services.actualevent_manager import populate_rolling_events_for_series, sync_all_active_series
 
 db_test = SqliteDatabase(':memory:', pragmas={'foreign_keys': 1})
 MODELS = [User, Chat, EventSerie, EventSerieSubscription, ActualEvent]
