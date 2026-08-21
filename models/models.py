@@ -4,6 +4,7 @@ from peewee import (
     DateField,
     DateTimeField,
     ForeignKeyField,
+    IntegerField,
     SmallIntegerField,
     TextField,
     BooleanField,
@@ -28,11 +29,17 @@ class User(BaseModel):
     id = BigIntegerField(primary_key = True) # tg id
     username = TextField(null = True)
     admin = BooleanField(default = False)
+    anilist_username = TextField(null=True)
     
 class Chat(BaseModel):
     id = BigIntegerField(primary_key = True) # tg id
     title = TextField(null = True)
 
+class AnilistAnime(BaseModel):
+    anilist_media_id = IntegerField(primary_key=True)
+    total_episodes = IntegerField(null=True)
+    cover_image_url = TextField(null=True)
+    
 class EventSerie(BaseModel):
     id = AutoField(primary_key = True)
     chat = ForeignKeyField(Chat, backref = 'event_series')
@@ -43,6 +50,8 @@ class EventSerie(BaseModel):
     start_date = DateField()
     end_date = DateField()
     is_active = BooleanField(default = True)
+    anilist_anime = ForeignKeyField(AnilistAnime, null=True, backref='series')
+    current_episode = IntegerField(default=1)
 
 class EventSerieSubscription(BaseModel):
     event_serie = ForeignKeyField(EventSerie, backref = 'partecipanti', on_delete = 'CASCADE')

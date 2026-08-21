@@ -53,9 +53,17 @@ def build_compact_schedule_dashboard(
             subs = get_series_subscribers(s.id)
             is_subbed = any(u.id == user_id for u in subs)
             time_str = s.default_event_time.strftime("%H:%M")
+            title_display = s.title
+            ep_str = f'[Ep. {s.current_episode}'
+            # Per ogni serie 's':
+            if s.anilist_anime:
+                ep_total = f"/{s.anilist_anime.total_episodes}" if s.anilist_anime.total_episodes else ""
+                ep_str = f" [Ep. {s.current_episode}{ep_total}]"
 
-            # Dashboard text line
-            lines.append(f"  • <code>{time_str}</code> <b>{s.title}</b> ({len(subs)} iscritti)")
+                if s.anilist_anime:
+                    title_display = f'<a href="https://anilist.co/anime/{s.anilist_anime.anilist_media_id}">{s.title}</a>'
+
+            lines.append(f"  • <code>{time_str}</code> <b>{title_display}</b>{ep_str} ({len(subs)} iscritti)")
 
             # Button per-serie: status icon + truncated title
             icon = "🔔" if is_subbed else "🔕"

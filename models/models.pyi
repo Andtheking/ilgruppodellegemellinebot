@@ -13,6 +13,7 @@ class User(Model):
     """_id from telegram_"""
     username: Optional[str]
     admin: bool
+    anilist_username: Optional[str]
     
     iscrizioni_eventi: ModelSelect['EventSerieSubscription']
 
@@ -22,6 +23,13 @@ class Chat(Model):
     title: Optional[str]
     
     event_series: ModelSelect['EventSerie']
+
+class AnilistAnime(Model):
+    anilist_media_id: int
+    total_episodes: int
+    cover_image_url: Optional[str] 
+
+    series: ModelSelect['EventSerie']
 
 class EventSerie(Model):
     id: int
@@ -34,6 +42,8 @@ class EventSerie(Model):
     start_date: datetime.date
     end_date: datetime.date
     is_active: bool
+    anilist_anime: AnilistAnime
+    current_episode: int 
 
     partecipanti: ModelSelect['EventSerieSubscription']
     events: ModelSelect['ActualEvent']
