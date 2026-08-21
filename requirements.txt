@@ -10,6 +10,7 @@ httpx==0.28.1
 idna==3.19
 iniconfig==2.3.0
 jsonpickle==4.1.2
+Kurigram==2.2.24
 librt==0.15.0
 mypy==2.3.1
 mypy_extensions==1.1.0
@@ -18,11 +19,13 @@ pathspec==1.1.1
 peewee==4.3.0
 peewee-migrate==1.15.0
 pluggy==1.6.0
+pyaes==1.6.1
 Pygments==2.21.0
 pyrefly==1.2.0
 pytest==9.1.1
 python-dotenv==1.2.3
-python-telegram-bot[job-queue]==22.8
+python-socks==2.8.1
+python-telegram-bot==22.8
 requests==2.34.2
 types-peewee==4.3.0.20260807
 typing_extensions==4.16.0
