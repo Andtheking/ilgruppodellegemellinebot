@@ -14,37 +14,71 @@ from bot.CustomCommandHandler import CustomCommandHandler
 from bot.commands.do_always import middleware
 from bot.utils.constants import DAYS
 from bot.utils.checks import is_user_groupadmin
-from models.models import AnilistAnime
+from models.models import AnilistAnime, Chat
 from services.anilist_manager import fetch_anime_info_by_id
 from services.eventseries_manager import create_series_with_events
+from bot.bot_config import bot_config
 
 # conversation steps
 (
     ASK_TITLE,
     ASK_ANILIST_ID,
+    ASK_START_EPISODE,
     ASK_DAY_OF_WEEK,
     ASK_EVENT_TIME,
     ASK_REMIND_TIME,
     ASK_START_DATE,
     ASK_END_DATE,
-) = range(7)
+) = range(8)
+
+
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.ext import ContextTypes
+from bot.utils.checks import is_user_groupadmin
+
+
+async def new_serie_group_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    if not await is_user_groupadmin(update, context):
+        return
+
+    chat_id = update.effective_chat.id
+    deep_link = f"https://t.me/{bot_config.BOT_USERNAME}?start=newserie_{chat_id}"
+
+    keyboard = InlineKeyboardMarkup([[
+        InlineKeyboardButton("⚙️ Avvia configurazione in privato", url=deep_link)
+    ]])
+
+    raw_dict = update.effective_message.to_dict()
+    ephemeral_id = raw_dict.get("ephemeral_message_id")
+    extra_params = {"receiver_user_id": update.effective_user.id}
+    if ephemeral_id:
+        extra_params["reply_parameters"] = {"ephemeral_message_id": ephemeral_id}
+
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text="🎬 Per creare una nuova serie ed evitare spam nel gruppo, proseguiamo in chat privata:",
+        reply_markup=keyboard,
+        api_kwargs=extra_params
+    )
 
 
 async def start_new_serie(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Inizio wizard: verifica admin e chiede il titolo."""
 
-    if update.effective_chat.type == ChatType.PRIVATE:
-        await update.message.reply_text("Usa questo comando in un gruppo...")
+    if update.effective_chat.type != ChatType.PRIVATE:
         return ConversationHandler.END
 
-    if not await is_user_groupadmin(update, context):
-        await update.message.reply_text("⛔ Solo gli admin del gruppo possono creare nuovi eventi.")
+    args = context.args  # Contiene ['newserie_-10012345678']
+    if not args or not args[0].startswith("newserie_"):
         return ConversationHandler.END
 
-    context.user_data["new_serie"] = {"chat_id": update.effective_chat.id}
+    group_chat_id = int(args[0].replace("newserie_", ""))
+
+    context.user_data.clear()
+    context.user_data["new_serie"] = {"chat_id": group_chat_id}
 
     await update.message.reply_text(
-        "🗓️ <b>Creazione nuova Serie di Eventi</b>\n\n"
+        f"🗓️ <b>Creazione nuova Serie di Eventi</b> per il gruppo <i><b>{Chat.get_by_id(group_chat_id).title}</b></i>\n\n"
         "Inserisci il <b>titolo</b> della serie (es. <i>🎬 Watchparty Yani Neko</i>):\n"
         "(Scrivi /cancel per annullare in qualsiasi momento)",
         parse_mode="HTML",
@@ -91,32 +125,62 @@ async def serie_anilist_received(update: Update, context: ContextTypes.DEFAULT_T
     )
     context.user_data["new_serie"]["anilist_anime"] = anime_record
 
-    keyboard = [DAYS[:3], DAYS[3:5], DAYS[5:]]
-    reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
-
     await update.message.reply_text(
-        f"✅ Trovato: <b>{anime_data['title']}</b>\n\nIn quale <b>giorno della settimana</b> si terrà l'evento?",
-        parse_mode="HTML",
-        reply_markup=reply_markup
+        f"✅ Trovato: <b>{anime_data['title']}</b>. Da quale <b>episodio</b> si parte? (Default: <code>1</code>)\n"
+        "<i>Invia il numero o scrivi /skip per partire da 1:</i>",
+        parse_mode="HTML"
     )
-    return ASK_DAY_OF_WEEK
+    return ASK_START_EPISODE
 
 
 async def serie_anilist_skip(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     context.user_data["new_serie"]["anilist_anime"] = None
+
     await update.message.reply_text(
-        "In quale giorno della settimana si terrà? (0=Lun, 6=Dom):"
+        "✅ Trovato: <b>{anime_data['title']}</b>. Da quale <b>episodio</b> si parte? (Default: <code>1</code>)\n"
+        "<i>Invia il numero o scrivi /skip per partire da 1:</i>",
+        parse_mode="HTML"
     )
+    return ASK_START_EPISODE
+
+
+async def set_start_episode(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """_Saves starting episode and finalizes series creation._"""
+    if not update.message or not update.message.text:
+        return ASK_START_EPISODE
+
+    raw_input = update.message.text.strip()
+    try:
+        current_ep = max(1, int(raw_input))
+    except ValueError:
+        await update.message.reply_text("⚠️ Inserisci un numero intero valido (es. <code>1</code>) oppure /skip:")
+        return ASK_START_EPISODE
+
+    context.user_data["new_serie"]["current_episode"] = current_ep
 
     keyboard = [DAYS[:3], DAYS[3:5], DAYS[5:]]
     reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
 
     await update.message.reply_text(
-        f"⏭️ Saltato.\n\nIn quale <b>giorno della settimana</b> si terrà l'evento?",
+        f"In quale <b>giorno della settimana</b> si terrà l'evento?",
         parse_mode="HTML",
         reply_markup=reply_markup
     )
     return ASK_DAY_OF_WEEK
+
+
+async def skip_start_episode(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """_Defaults starting episode to 1 and finalizes series creation._"""
+
+    keyboard = [DAYS[:3], DAYS[3:5], DAYS[5:]]
+    reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
+    await update.message.reply_text(
+        f"Va bene, inizierà dall'episodio 1. In quale <b>giorno della settimana</b> si terrà l'evento?",
+        parse_mode="HTML",
+        reply_markup=reply_markup
+    )
+    return ASK_DAY_OF_WEEK
+
 
 async def set_day_of_week(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     day_text = update.message.text.strip().capitalize()
@@ -240,11 +304,27 @@ async def cancel_creation(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     return ConversationHandler.END
 
 
+import re
+
 create_series_handler = ConversationHandler(
-    entry_points=[CustomCommandHandler('newserie', middleware(start_new_serie))],
+    entry_points=[
+        # Si avvia solo in chat privata quando si clicca sul link generato dal gruppo
+        CommandHandler(
+            "start",
+            middleware(start_new_serie),
+            filters=filters.ChatType.PRIVATE & filters.Regex(r"^/start newserie_"),
+        )
+    ],
     states={
         ASK_TITLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, middleware(set_title))],
-        ASK_ANILIST_ID: [MessageHandler(filters.TEXT & ~filters.COMMAND, middleware(serie_anilist_received)), CommandHandler("skip", serie_anilist_skip, filters=~filters.Text("cancel"))],
+        ASK_ANILIST_ID: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, middleware(serie_anilist_received)),
+            CommandHandler("skip", middleware(serie_anilist_skip)),
+        ],
+        ASK_START_EPISODE: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, middleware(set_start_episode)),
+            CommandHandler("skip", middleware(skip_start_episode)),
+        ],
         ASK_DAY_OF_WEEK: [MessageHandler(filters.TEXT & ~filters.COMMAND, middleware(set_day_of_week))],
         ASK_EVENT_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, middleware(set_event_time))],
         ASK_REMIND_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, middleware(set_remind_time))],

@@ -41,7 +41,7 @@ def categorize_subscribers_progress(
     ]
 
     for user in linked_users:
-        mention = f"@{user.username}" if user.username else f'<a href="tg://user?id={user.id}">Utente</a>'
+        mention = f"{user.username}" if user.username else f'<a href="tg://user?id={user.id}">Utente</a>'
         user_anilist = (user.anilist_username or "").lower()
         user_ep = progress_map.get(user_anilist, 0)
 

@@ -14,6 +14,7 @@ import re
 
 from bot.CustomCommandHandler import CustomCommandHandler
 from bot.bot_config import bot_config
+from bot.commands.user_commands import set_anilist_command
 from bot.jobs.reminder import check_reminders_job, daily_sync_job
 from utils.log import log
 
@@ -23,7 +24,7 @@ from bot.commands.subscription import list_series_command, subscription_callback
 from bot.jobs.initialize import initialize
 from bot.jobs.send_logs import send_logs_channel
 
-from bot.commands.create_series import create_series_handler
+from bot.commands.create_series import create_series_handler, new_serie_group_entry
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -53,9 +54,11 @@ def start_bot():
         "help": CustomCommandHandler('help',middleware(help)),
         "addAdmin": CustomCommandHandler('addAdmin', other='(?P<candidate>.+)?', callback=middleware(add_admin)),
         "removeAdmin": CustomCommandHandler('removeAdmin', other='(?P<candidate>.+)?', callback=middleware(remove_admin)),
-        "createSeries": create_series_handler,
+        "createSeriesPublic": CustomCommandHandler('newserie', callback=middleware(new_serie_group_entry)),
+        "createSeriesPrivate": create_series_handler,
         "getSeries": CustomCommandHandler("series", callback=middleware(list_series_command)),
         "subCallback": CallbackQueryHandler(middleware(subscription_callback_handler), pattern="^toggle_sub:"),
+        "setAnilist": CustomCommandHandler("set_anilist", other="(?P<profile>.+)", callback=middleware(set_anilist_command))
     }
     
     for v in handlers.values():

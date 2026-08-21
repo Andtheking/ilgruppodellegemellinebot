@@ -16,7 +16,7 @@ async def set_anilist_command(update: Update, context: ContextTypes.DEFAULT_TYPE
 
     chat_id = update.effective_chat.id
     user_tg = update.effective_user
-    args = context.args
+    anilist_username = context.match.groupdict().get('profile', None)
 
     # Gestione parametri effimeri se il comando viene invocato in un gruppo
     raw_dict = update.effective_message.to_dict()
@@ -25,11 +25,11 @@ async def set_anilist_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     if ephemeral_id:
         extra_params["reply_parameters"] = {"ephemeral_message_id": ephemeral_id}
 
-    if not args:
+    if not anilist_username:
         help_text = (
             "ℹ️ <b>Come collegare il tuo account AniList:</b>\n\n"
             "Usa il comando specificando il tuo username:\n"
-            "<code>/setanilist TuoUsername</code>\n\n"
+            "<code>/set_anilist TuoUsername</code>\n\n"
             "<i>Serve per tracciare automaticamente gli episodi che hai già visto!</i>"
         )
         await context.bot.send_message(
@@ -40,7 +40,7 @@ async def set_anilist_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         )
         return
 
-    input_username = args[0].strip()
+    input_username = anilist_username.strip()
 
     # Verifica l'esistenza su AniList
     canonical_username = verify_anilist_user(input_username)
@@ -54,7 +54,7 @@ async def set_anilist_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         return
 
     # Salva o aggiorna l'utente nel DB
-    user, _ = User.get_by_id(user_tg.id)
+    user = User.get_by_id(user_tg.id)
     user: User
     user.anilist_username = canonical_username
     if user_tg.username:

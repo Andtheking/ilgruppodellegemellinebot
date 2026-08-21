@@ -34,6 +34,10 @@ async def initialize(context: ContextTypes.DEFAULT_TYPE) -> None:
             "command": "newserie",
             "description": "ADMIN: Crea un nuovo evento",
         },
+        {
+            "command": "set_anilist",
+            "description": "Linka il tuo profilo anilist!",
+        },
     ]
 
     await set_bot_commands(context.bot, commands_list)
