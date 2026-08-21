@@ -11,8 +11,8 @@ from telegram.ext import (
 )
 from bot.CustomCommandHandler import CustomCommandHandler
 from bot.commands.do_always import middleware
-from models.models import Chat, EventSerie
-from services.actualevent_manager import populate_rolling_events_for_series
+from bot.utils.constants import DAYS
+from bot.utils.checks import is_user_groupadmin
 from services.eventseries_manager import create_series_with_events
 
 # conversation steps
@@ -24,27 +24,6 @@ from services.eventseries_manager import create_series_with_events
     ASK_START_DATE,
     ASK_END_DATE,
 ) = range(6)
-
-DAYS_MAP = {
-    "Lunedì": 0,
-    "Martedì": 1,
-    "Mercoledì": 2,
-    "Giovedì": 3,
-    "Venerdì": 4,
-    "Sabato": 5,
-    "Domenica": 6,
-}
-
-
-async def is_user_groupadmin(update: Update, context: ContextTypes.DEFAULT_TYPE) -> bool:
-    """Verifica se l'utente che lancia il comando è amministratore della chat."""
-    
-    member = await context.bot.get_chat_member(
-        chat_id=update.effective_chat.id,
-        user_id=update.effective_user.id
-    )
-    
-    return member.status in (telegram.ChatMember.OWNER, telegram.ChatMember.ADMINISTRATOR)
 
 
 async def start_new_serie(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -78,7 +57,7 @@ async def set_title(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
     context.user_data["new_serie"]["title"] = title
 
-    keyboard = [["Lunedì", "Martedì", "Mercoledì"], ["Giovedì", "Venerdì"], ["Sabato", "Domenica"]]
+    keyboard = [DAYS[:3], DAYS[3:5], DAYS[5:]]
     reply_markup = ReplyKeyboardMarkup(keyboard, one_time_keyboard=True, resize_keyboard=True)
 
     await update.message.reply_text(
@@ -91,11 +70,11 @@ async def set_title(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 async def set_day_of_week(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     day_text = update.message.text.strip().capitalize()
-    if day_text not in DAYS_MAP:
+    if day_text not in DAYS:
         await update.message.reply_text("Giorno non valido. Selezionalo dalla tastiera sotto:")
         return ASK_DAY_OF_WEEK
 
-    context.user_data["new_serie"]["day_of_week"] = DAYS_MAP[day_text]
+    context.user_data["new_serie"]["day_of_week"] = DAYS.index(day_text)
 
     await update.message.reply_text(
         f"Giorno: <b>{day_text}</b>\n\nA che <b>orario</b> inizia l'evento? (Formato HH:MM, es. <code>21:30</code>)",
@@ -148,7 +127,7 @@ async def set_start_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
 
     await update.message.reply_text(
         f"Data inizio: <b>{parsed_date.strftime('%Y-%m-%d')}</b>\n\n"
-        "Fino a quale <b>data di fine</b> deve durare la serie? (Formato YYYY-MM-DD, oppure scrivi <code>nessuna</code> per durata indefinita)",
+        "Fino a quale <b>data di fine</b> deve durare la serie? (Formato YYYY-MM-DD)",
         parse_mode="HTML"
     )
     return ASK_END_DATE
@@ -172,12 +151,11 @@ async def set_end_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     serie, eventi_creati = create_series_with_events(
         chat_id=data["chat_id"],
         title=data["title"],
-        default_event_time=data["event_time"],
-        default_remind_time=data["remind_time"],
+        event_time=data["event_time"],
+        remind_time=data["remind_time"],
         day_of_week=data["day_of_week"],
         start_date=data["start_date"],
         end_date=end_date,
-        is_active=True
     )
 
     context.user_data.clear()

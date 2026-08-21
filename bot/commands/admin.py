@@ -6,9 +6,11 @@ from models.models import User
 from bot.utils.answer_message import rispondi
 from utils.log import log
 
-def admin_function(inner_function):
-    """
-    Meant to be used as decorator
+def admin_function(inner_function: function):
+    """_Decorator that checks if a bot command is executed by a bot admin_
+
+    Args:
+        inner_function (_function_): _The admin-only function_
     """
     async def wrapper(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not is_admin(update.effective_user.id):

@@ -1,6 +1,7 @@
 from utils.json_utils import load_configs, fromJSONFile, toJSONFile
 from utils.log import LOGQUEUE_PATH
 
+from bot.bot_config import bot_config
 from telegram.constants import ParseMode
 from telegram.ext import ContextTypes
 
@@ -32,7 +33,7 @@ async def send_logs_channel(context: ContextTypes.DEFAULT_TYPE):
     
     while len(mex) > 0:
         too_long = mex[0:4095] # Diviso per massimo di telegram
-        await context.bot.send_message(load_configs()["canale_log"], too_long, parse_mode=ParseMode.HTML)
+        await context.bot.send_message(bot_config.CANALE_LOG, too_long, parse_mode=ParseMode.HTML)
         mex = mex[4095:] # telegram limit
         await sleep(5) # telegram limit
     
