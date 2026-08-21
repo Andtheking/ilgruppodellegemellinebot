@@ -25,7 +25,7 @@ pyrefly==1.2.0
 pytest==9.1.1
 python-dotenv==1.2.3
 python-socks==2.8.1
-python-telegram-bot==22.8
+python-telegram-bot[job-queue]==22.8
 requests==2.34.2
 types-peewee==4.3.0.20260807
 typing_extensions==4.16.0
