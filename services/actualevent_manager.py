@@ -85,5 +85,8 @@ def sync_all_active_series() -> int:
 
     for serie in active_series:
         total_created += populate_rolling_events_for_series(serie)
+        if serie.end_date < datetime.date.today():
+            serie.is_active = False
+            serie.save(only=[EventSerie.is_active])
 
     return total_created

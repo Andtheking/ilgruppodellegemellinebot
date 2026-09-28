@@ -14,13 +14,13 @@ import re
 
 from bot.CustomCommandHandler import CustomCommandHandler
 from bot.bot_config import bot_config
-from bot.commands.user_commands import set_anilist_command
+from bot.commands.set_anilist import set_anilist_command
 from bot.jobs.reminder import check_reminders_job, daily_sync_job
 from utils.log import log
 
 from bot.commands.admin import add_admin, remove_admin
 from bot.commands.do_always import middleware
-from bot.commands.subscription import list_series_command, subscription_callback_handler
+from bot.commands.series_list import list_series_command, subscription_callback_handler
 from bot.jobs.initialize import initialize
 from bot.jobs.send_logs import send_logs_channel
 
@@ -57,7 +57,7 @@ def start_bot():
         "createSeriesPublic": CustomCommandHandler('newserie', callback=middleware(new_serie_group_entry)),
         "createSeriesPrivate": create_series_handler,
         "getSeries": CustomCommandHandler("series", callback=middleware(list_series_command)),
-        "subCallback": CallbackQueryHandler(middleware(subscription_callback_handler), pattern="^toggle_sub:"),
+        "subCallback": CallbackQueryHandler(middleware(subscription_callback_handler), pattern=r"^(show_day|toggle_sub):"),
         "setAnilist": CustomCommandHandler("set_anilist", other="(?P<profile>.+)", callback=middleware(set_anilist_command))
     }
     
@@ -80,7 +80,7 @@ def start_bot():
 
     jq.run_repeating(check_reminders_job, interval=60, first=10)
 
-    jq.run_once(daily_sync_job, when=10)
+    jq.run_once(daily_sync_job, when=1)
     jq.run_daily(daily_sync_job, time=datetime.time(hour=3, minute=0, second=0))
     
     application.run_polling()

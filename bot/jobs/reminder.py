@@ -67,7 +67,7 @@ async def check_reminders_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             sent_events.append(event)
 
         divider = "\n\n" + "—" * 16 + "\n\n"
-        message_text = "🔔 <b>PROMEMORIA WATCHPARTY IN ARRIVO!</b>\n\n" + divider.join(sections)
+        message_text = "🔔 <b>PROMEMORIA IN ARRIVO!</b>\n\n" + divider.join(sections)
 
         try:
             await context.bot.send_message(
