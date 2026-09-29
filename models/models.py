@@ -71,3 +71,21 @@ class ActualEvent(BaseModel):
         indexes = (
             (('status', 'remind_datetime'), False), # that False is "is_unique" param
         )
+
+class SharedEventSerie(BaseModel):
+    event_serie = ForeignKeyField(
+        column_name='event_serie_id', 
+        field='id', 
+        model=EventSerie, 
+        on_delete='CASCADE'
+    )
+    chat = ForeignKeyField(
+        column_name='chat_id', 
+        field='id', 
+        model=Chat, 
+        on_delete='CASCADE'
+    )
+
+    class Meta:
+        table_name = "sharedeventserie"
+        primary_key = CompositeKey('event_serie', 'chat')

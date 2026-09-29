@@ -59,3 +59,7 @@ class ActualEvent(Model):
     remind_datetime: datetime.datetime
     status: str
     note: Optional[str]
+
+class SharedEventSerie(Model):
+    event_serie: EventSerie
+    chat: Chat
