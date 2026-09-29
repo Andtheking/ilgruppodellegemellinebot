@@ -22,7 +22,7 @@ from utils.log import log
 from bot.commands.admin import add_admin, remove_admin
 from bot.commands.do_always import middleware
 from bot.commands.series_list import list_series_command, subscription_callback_handler
-from bot.commands.event_sharing import generate_share_link, handle_group_start, share_link_callback
+from bot.commands.event_sharing import handle_group_start, share_link_callback
 from bot.jobs.initialize import initialize
 from bot.jobs.send_logs import send_logs_channel
 
@@ -66,7 +66,6 @@ def start_bot():
         "getSeries": CustomCommandHandler("series", callback=middleware(list_series_command)),
         "subCallback": CallbackQueryHandler(middleware(subscription_callback_handler), pattern=r"^(show_day|toggle_sub):"),
         "setAnilist": CustomCommandHandler("set_anilist", other="(?P<profile>.+)", callback=middleware(set_anilist_command)),
-        "share": CustomCommandHandler("shareserie", middleware(generate_share_link)),
         "share_callback": CallbackQueryHandler(share_link_callback, pattern=r"^share_link:",),
     }
     
