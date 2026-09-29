@@ -1,6 +1,8 @@
 from typing import Any, Dict, List, Optional, Tuple
 import requests
 
+from utils.log import log
+
 ANILIST_API_URL = "https://graphql.anilist.co"
 
 QUERY_USER_PROGRESS = """
@@ -41,7 +43,7 @@ def get_users_anime_progress(
                 if data and "progress" in data:
                     progress_map[username.lower()] = data["progress"]
         except Exception as error:
-            print(f"Errore recupero AniList per {username}: {error}")
+            log(f"Errore recupero AniList per {username}: {error}")
 
     return progress_map
 
@@ -96,7 +98,7 @@ def fetch_anime_info_by_id(anilist_id: int) -> Optional[Dict[str, Any]]:
             "site_url": data["siteUrl"]
         }
     except Exception as error:
-        print(f"Errore durante la chiamata ad AniList: {error}")
+        log(f"Errore durante la chiamata ad AniList: {error}")
         return None
 
 
@@ -132,5 +134,5 @@ def verify_anilist_user(username: str) -> Optional[str]:
         data = response.json().get("data", {}).get("User")
         return data["name"] if data else None
     except Exception as error:
-        print(f"Errore verifica utente AniList: {error}")
+        log(f"Errore verifica utente AniList: {error}")
         return None

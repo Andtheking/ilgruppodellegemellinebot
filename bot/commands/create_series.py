@@ -10,6 +10,7 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
+from bot.ephimeral_patch.EphemeralUtils import build_ephemeral_reply_context
 from bot.CustomCommandHandler import CustomCommandHandler
 from bot.commands.do_always import middleware
 from bot.utils.constants import DAYS
@@ -34,10 +35,12 @@ from bot.bot_config import bot_config
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
+
+from bot.ephimeral_patch.EphemeralContext import EphemeralContext
 from bot.utils.checks import is_user_groupadmin
 
 
-async def new_serie_group_entry(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def new_serie_group_entry(update: Update, context: EphemeralContext) -> None:
     if not await is_user_groupadmin(update, context):
         return
 
@@ -48,17 +51,14 @@ async def new_serie_group_entry(update: Update, context: ContextTypes.DEFAULT_TY
         InlineKeyboardButton("⚙️ Avvia configurazione in privato", url=deep_link)
     ]])
 
-    raw_dict = update.effective_message.to_dict()
-    ephemeral_id = raw_dict.get("ephemeral_message_id")
-    extra_params = {"receiver_user_id": update.effective_user.id}
-    if ephemeral_id:
-        extra_params["reply_parameters"] = {"ephemeral_message_id": ephemeral_id}
+    ephem_params, reply_params = build_ephemeral_reply_context(update)
 
-    await context.bot.send_message(
+    await context.bot.send_ephemeral_message(
         chat_id=chat_id,
         text="🎬 Per creare una nuova serie ed evitare spam nel gruppo, proseguiamo in chat privata:",
         reply_markup=keyboard,
-        api_kwargs=extra_params
+        reply_parameters=reply_params,
+        ephemeral_parameters=ephem_params
     )
 
 

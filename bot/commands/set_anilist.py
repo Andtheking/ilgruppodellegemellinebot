@@ -2,9 +2,10 @@ from telegram import Update
 from telegram.ext import ContextTypes
 from models.models import User
 from services.anilist_manager import verify_anilist_user
+from bot.ephimeral_patch.EphemeralUtils import build_ephemeral_reply_context
+from bot.ephimeral_patch.EphemeralContext import EphemeralContext
 
-
-async def set_anilist_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def set_anilist_command(update: Update, context: EphemeralContext) -> None:
     """_Links or updates the caller's AniList username in the database with validation._
 
     Args:
@@ -18,12 +19,7 @@ async def set_anilist_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     user_tg = update.effective_user
     anilist_username = context.match.groupdict().get('profile', None)
 
-    # Gestione parametri effimeri se il comando viene invocato in un gruppo
-    raw_dict = update.effective_message.to_dict()
-    ephemeral_id = raw_dict.get("ephemeral_message_id")
-    extra_params = {"receiver_user_id": user_tg.id}
-    if ephemeral_id:
-        extra_params["reply_parameters"] = {"ephemeral_message_id": ephemeral_id}
+    eph, repl = build_ephemeral_reply_context(update)
 
     if not anilist_username:
         help_text = (
@@ -32,11 +28,12 @@ async def set_anilist_command(update: Update, context: ContextTypes.DEFAULT_TYPE
             "<code>/set_anilist TuoUsername</code>\n\n"
             "<i>Serve per tracciare automaticamente gli episodi che hai già visto!</i>"
         )
-        await context.bot.send_message(
+        await context.bot.send_ephemeral_message(
             chat_id=chat_id,
             text=help_text,
             parse_mode="HTML",
-            api_kwargs=extra_params,
+            ephemeral_parameters=eph,
+            reply_parameters=repl
         )
         return
 
@@ -45,11 +42,12 @@ async def set_anilist_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Verifica l'esistenza su AniList
     canonical_username = verify_anilist_user(input_username)
     if not canonical_username:
-        await context.bot.send_message(
+        await context.bot.send_ephemeral_message(
             chat_id=chat_id,
             text=f"⚠️ Utente AniList <b>{input_username}</b> non trovato. Controlla lo spelling e riprova.",
             parse_mode="HTML",
-            api_kwargs=extra_params,
+            ephemeral_parameters=eph,
+            reply_parameters=repl
         )
         return
 
@@ -61,12 +59,13 @@ async def set_anilist_command(update: Update, context: ContextTypes.DEFAULT_TYPE
         user.username = user_tg.username
     user.save()
 
-    await context.bot.send_message(
+    await context.bot.send_ephemeral_message(
         chat_id=chat_id,
         text=(
             f"✅ Account AniList collegato con successo!\n\n"
             f"👤 <b>Profilo:</b> <a href=\"https://anilist.co/user/{canonical_username}\">{canonical_username}</a>"
         ),
         parse_mode="HTML",
-        api_kwargs=extra_params,
+        ephemeral_parameters=eph,
+        reply_parameters=repl
     )

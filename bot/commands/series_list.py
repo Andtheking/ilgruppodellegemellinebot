@@ -2,8 +2,12 @@ from collections import defaultdict
 from typing import Dict, List, Optional, Tuple
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
-from models.models import Chat, EventSerie
+from models.models import Chat, EventSerie, SharedEventSerie
 from services.subscribe_to_eventseries import get_series_subscribers, toggle_subscription
+from bot.utils.checks import is_user_groupadmin
+from bot.ephimeral_patch.EphemeralUtils import build_ephemeral_reply_context
+from bot.ephimeral_patch.EphemeralContext import EphemeralContext
+from utils.log import log
 
 DAYS_NAME = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"]
 DAYS_SHORT = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"]
@@ -12,7 +16,8 @@ DAYS_SHORT = ["Lun", "Mar", "Mer", "Gio", "Ven", "Sab", "Dom"]
 def build_day_schedule_dashboard(
     chat_id: int, 
     user_id: int,
-    selected_day: Optional[int] = None
+    selected_day: Optional[int] = None,
+    is_admin: bool = False
 ) -> Tuple[str, InlineKeyboardMarkup]:
     """_Builds a daily paginated schedule text and inline keyboard for active series._
 
@@ -25,13 +30,14 @@ def build_day_schedule_dashboard(
         Tuple[str, InlineKeyboardMarkup]: _A tuple containing the formatted HTML dashboard text and inline keyboard markup._
     """
     active_series = list(
-        EventSerie
-        .select()
+        EventSerie.select()
+        .left_outer_join(SharedEventSerie, on=(SharedEventSerie.event_serie == EventSerie.id))
         .where(
-            (EventSerie.chat == chat_id) &
-            (EventSerie.is_active == True)
+            (EventSerie.is_active == True) &
+            ((EventSerie.chat == chat_id) | (SharedEventSerie.chat == chat_id))
         )
         .order_by(EventSerie.day_of_week, EventSerie.default_event_time)
+        .distinct()
     )
 
     if not active_series:
@@ -60,7 +66,7 @@ def build_day_schedule_dashboard(
     # 2. Composizione del testo per il giorno selezionato
     full_day_name = DAYS_NAME[selected_day]
     lines = [
-        f"📅 <b>PALINSESTO WATCHPARTY</b> — <b>{full_day_name}</b>\n"
+        f"📅 <b>EVENTI</b> - <b>{full_day_name}</b>\n"
     ]
 
     series_of_day = by_day[selected_day]
@@ -72,8 +78,7 @@ def build_day_schedule_dashboard(
         time_str = event.default_event_time.strftime("%H:%M")
 
         # Pulizia titolo
-        title = event.title.replace("Watchparty", "").replace("🎬", "").strip()
-        
+        title = event.title.replace("Watchparty ", "").strip()
         tot_eps = f"/{event.anilist_anime.total_episodes}" if event.anilist_anime and event.anilist_anime.total_episodes else ""
         ep_info = f"ep. {event.current_episode}{tot_eps}"
 
@@ -81,6 +86,10 @@ def build_day_schedule_dashboard(
             title_display = f'<a href="https://anilist.co/anime/{event.anilist_anime.anilist_media_id}">{title}</a>'
         else:
             title_display = title
+
+        if event.chat.id != chat_id:
+            title_display = f"🤝 {title_display}"
+        
 
         lines.append(f"• <code>{time_str}</code> │ {title_display} (<i>{ep_info}</i>) · 👥 {len(subs)}")
 
@@ -90,6 +99,10 @@ def build_day_schedule_dashboard(
         current_btn_row.append(
             InlineKeyboardButton(btn_label, callback_data=f"toggle_sub:{event.id}:{selected_day}")
         )
+        if is_admin:
+            current_btn_row.append(
+                InlineKeyboardButton(f"🔗 Condividi", callback_data=f"share_link:{event.id}")
+            )
 
         if len(current_btn_row) == 2:
             keyboard_rows.append(current_btn_row)
@@ -103,7 +116,7 @@ def build_day_schedule_dashboard(
     return "\n".join(lines), InlineKeyboardMarkup(keyboard_rows)
 
 
-async def list_series_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+async def list_series_command(update: Update, context: EphemeralContext) -> None:
     """_Displays the day-paginated schedule dashboard as an ephemeral message._"""
     if not update.effective_chat or not update.effective_user or not update.effective_message:
         return
@@ -112,25 +125,16 @@ async def list_series_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     user_id = update.effective_user.id
     Chat.get_or_create(id=chat_id, defaults={'title': update.effective_chat.title or "Chat"})
 
-    text, reply_markup = build_day_schedule_dashboard(chat_id, user_id)
+    text, reply_markup = build_day_schedule_dashboard(chat_id, user_id, is_admin=await is_user_groupadmin(update, context))
 
-    raw_dict = update.effective_message.to_dict()
-    ephemeral_id = raw_dict.get("ephemeral_message_id")
+    eph_params, reply_params = build_ephemeral_reply_context(update)
 
-    extra_params = {
-        "receiver_user_id": user_id,
-    }
-    if ephemeral_id:
-        extra_params["reply_parameters"] = {
-            "ephemeral_message_id": ephemeral_id
-        }
-
-    await context.bot.send_message(
+    await context.bot.send_ephemeral_message(
         chat_id=chat_id,
         text=text,
         reply_markup=reply_markup,
         parse_mode="HTML",
-        api_kwargs=extra_params,
+        ephemeral_parameters=eph_params
     )
 
 
@@ -169,7 +173,7 @@ async def subscription_callback_handler(update: Update, context: ContextTypes.DE
         return
 
     # Rigenera il dashboard con il giorno corrente
-    text, reply_markup = build_day_schedule_dashboard(chat_id, user_tg.id, selected_day=selected_day)
+    text, reply_markup = build_day_schedule_dashboard(chat_id, user_tg.id, selected_day=selected_day, is_admin=await is_user_groupadmin(update, context))
 
     raw_query = query.to_dict()
     raw_message = raw_query.get("message", {})
@@ -193,4 +197,4 @@ async def subscription_callback_handler(update: Update, context: ContextTypes.DE
             data=payload,
         )
     except Exception as error:
-        print(f"Errore editEphemeralMessageText: {error}")
+        log(f"Errore editEphemeralMessageText: {error}")
