@@ -1,6 +1,7 @@
 import datetime
 
-from telegram import Update
+from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.constants import ParseMode
 from telegram.ext import (
     Application,
     ApplicationBuilder,
@@ -34,10 +35,42 @@ from bot.commands.create_series import create_series_handler, new_serie_group_en
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(f'Hai avviato il bot, congrats')
+    testo = (
+        "👋 <b>Ciao! Sono il bot dei Watchparty!</b> 🍿\n\n"
+        "Sono stato creato per aiutarti a organizzare le visioni di gruppo: tengo traccia "
+        "degli episodi, ti ricordo quando iniziare e mi sincronizzo con AniList.\n\n"
+        "👇 <b>Da dove iniziamo?</b>\n"
+        "Il mio habitat naturale sono i gruppi. Aggiungimi a una chat di gruppo per creare "
+        "un palinsesto, oppure usa /help per scoprire di più."
+    )
+    
+    tastiera = InlineKeyboardMarkup([[
+        InlineKeyboardButton("➕ Aggiungimi a un gruppo", url=f"https://t.me/{bot_config.BOT_USERNAME}?startgroup=true")
+    ]])
+    
+    await update.message.reply_text(text=testo, reply_markup=tastiera, parse_mode=ParseMode.HTML)
 
-async def help(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("aiuto")
+async def help(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Invia il messaggio di aiuto del bot."""
+    help_text = (
+        "🎬 <b>BENVENUTO NEL BOT DEI WATCHPARTY!</b>\n"
+        "Gestisco i palinsesti, tengo traccia degli episodi e ti avviso quando è ora di premere play. 🍿\n\n"
+        "👤 <b>COMANDI PER TUTTI</b>\n"
+        "• /series — Mostra il palinsesto settimanale del gruppo diviso per giorni. Da qui puoi navigare tra le giornate e iscriverti (🔔) o disiscriverti (🔕) dai singoli eventi.\n"
+        "• <code>/set_anilist &lt;nome_utente&gt;</code> — Collega il tuo account AniList per il tracciamento episodi.\n\n"
+        "⚙️ <b>FUNZIONI PER GLI ADMIN</b>\n"
+        "• <b>Condivisione:</b> Usando /series, vedrai un pulsante <b>🔗 Condividi</b> accanto agli eventi di proprietà del gruppo.\n\n"
+        "🤝 <b>EVENTI CONDIVISI</b>\n"
+        "Gli admin possono inviare il link di condivisione ad altri gruppi. Gli eventi ospitati saranno segnati con l'icona 🤝 nel palinsesto. L'avanzamento degli episodi rimane sincronizzato per tutti i gruppi partecipanti!\n\n"
+        "🔔 I promemoria arriveranno in automatico, taggando chi è in pari 🟢 e chi è indietro 🟡.\n\n"
+        "⚠️ Il bot è ancora in fase di sviluppo, per qualsiasi problema scrivi pure a @Andtheking."
+    )
+    
+    await update.message.reply_text(
+        text=help_text,
+        parse_mode=ParseMode.HTML,
+        disable_web_page_preview=True
+    )
 
 async def error(update: Update, context: ContextTypes.DEFAULT_TYPE):
     log(f'Update "{update}" caused error "{context.error}"',context.bot, "error")
@@ -56,8 +89,8 @@ def start_bot():
     application = ApplicationBuilder().bot(EphemeralExtBot(bot_config.TOKEN)).context_types(ContextTypes(context=EphemeralContext)).build()
     
     handlers = {
-        "start_group": CommandHandler('start', middleware(handle_group_start), filters=filters.ChatType.GROUPS),
-        # "start": CustomCommandHandler('start', middleware(start)),
+        "start": CommandHandler("start", middleware(start), filters=~filters.Regex(r"share_")),
+        "start_group": CommandHandler('start', middleware(handle_group_start), filters=filters.ChatType.GROUPS & filters.Regex(r"share_")),
         "help": CustomCommandHandler('help',middleware(help)),
         "addAdmin": CustomCommandHandler('addAdmin', other='(?P<candidate>.+)?', callback=middleware(add_admin)),
         "removeAdmin": CustomCommandHandler('removeAdmin', other='(?P<candidate>.+)?', callback=middleware(remove_admin)),
