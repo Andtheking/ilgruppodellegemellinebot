@@ -89,7 +89,7 @@ def start_bot():
     application = ApplicationBuilder().bot(EphemeralExtBot(bot_config.TOKEN)).context_types(ContextTypes(context=EphemeralContext)).build()
     
     handlers = {
-        "start": CommandHandler("start", middleware(start), filters=~filters.Regex(r"share_")),
+        "start": CommandHandler("start", middleware(start), filters=~filters.Regex(r"share_") & ~filters.ChatType.GROUPS),
         "start_group": CommandHandler('start', middleware(handle_group_start), filters=filters.ChatType.GROUPS & filters.Regex(r"share_")),
         "help": CustomCommandHandler('help',middleware(help)),
         "addAdmin": CustomCommandHandler('addAdmin', other='(?P<candidate>.+)?', callback=middleware(add_admin)),
