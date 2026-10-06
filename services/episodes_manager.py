@@ -13,7 +13,8 @@ def advance_episode(serie: EventSerie) -> Tuple[int, Optional[int]]:
 
     serie.current_episode += 1
     serie.save()
-    return serie.current_episode, serie.anilist_anime.total_episodes
+    total_episodes = serie.anilist_anime.total_episodes if serie.anilist_anime else None
+    return serie.current_episode, total_episodes
 
 
 def set_current_episode(serie_id: int, episode: int) -> None:

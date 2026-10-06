@@ -1,3 +1,4 @@
+import html
 from collections import defaultdict
 from typing import Dict, List, Tuple, Set
 from telegram.constants import ParseMode
@@ -8,7 +9,7 @@ from models.models import ActualEvent, User, SharedEventSerie  # Importa SharedE
 from services.episodes_manager import advance_episode
 from services.actualevent_manager import sync_all_active_series
 from services.notification_service import get_due_reminders, mark_events_as_sent
-from services.watchstatus_manager import categorize_subscribers_progress
+from services.watchstatus_manager import categorize_subscribers_progress_async
 from utils.log import log
 
 
@@ -18,6 +19,8 @@ async def check_reminders_job(context: ContextTypes.DEFAULT_TYPE) -> None:
     due_reminders = get_due_reminders()
     if not due_reminders:
         return
+
+    chat_member_cache: Dict[Tuple[int, int], bool] = {}
 
     # 1. Raggruppa gli eventi per chat_id (includendo i gruppi condivisi)
     reminders_by_chat: Dict[int, List[Tuple[ActualEvent, List[User]]]] = defaultdict(list)
@@ -44,20 +47,25 @@ async def check_reminders_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             serie = event.event_serie
             event_hour = event.event_datetime.strftime("%H:%M")
 
-            # FILTRO UTENTI: Controlla chi è davvero in questo gruppo
+            # FILTRO UTENTI: Controlla chi è davvero in questo gruppo (con cache per ciclo)
             local_users = []
             for user in global_users:
-                try:
-                    member = await context.bot.get_chat_member(chat_id, user.id)
-                    # Aggiungiamo l'utente solo se è ancora attivamente nel gruppo
-                    if member.status not in ['left', 'kicked']:
-                        local_users.append(user)
-                except (BadRequest, Forbidden):
-                    # Il bot non è nel gruppo o l'utente non è mai entrato
-                    continue
+                cache_key = (chat_id, user.id)
+                if cache_key in chat_member_cache:
+                    is_member = chat_member_cache[cache_key]
+                else:
+                    try:
+                        member = await context.bot.get_chat_member(chat_id, user.id)
+                        is_member = member.status not in ['left', 'kicked']
+                    except (BadRequest, Forbidden):
+                        is_member = False
+                    chat_member_cache[cache_key] = is_member
+
+                if is_member:
+                    local_users.append(user)
 
             # Analisi AniList SOLO per gli iscritti presenti in questa specifica chat
-            caught_up, behind, not_linked = categorize_subscribers_progress(serie, local_users)
+            caught_up, behind, not_linked = await categorize_subscribers_progress_async(serie, local_users)
 
             status_lines: List[str] = []
             if caught_up:
@@ -74,12 +82,13 @@ async def check_reminders_job(context: ContextTypes.DEFAULT_TYPE) -> None:
             total_eps = serie.anilist_anime.total_episodes if serie.anilist_anime else None
             tot_str = f"/{total_eps}" if total_eps else ""
 
+            escaped_title = html.escape(serie.title)
             if serie.anilist_anime:
-                title_line = f'<a href="https://anilist.co/anime/{serie.anilist_anime.anilist_media_id}">{serie.title}</a>'
+                title_line = f'<a href="https://anilist.co/anime/{serie.anilist_anime.anilist_media_id}">{escaped_title}</a>'
             else:
-                title_line = serie.title
+                title_line = escaped_title
 
-            note_line = f"\n📝 <b>Note:</b> {event.note}" if event.note else ""
+            note_line = f"\n📝 <b>Note:</b> {html.escape(event.note)}" if event.note else ""
 
             section_text = (
                 f"{prefix}<b>{title_line}</b> — <b>Episodio {serie.current_episode}{tot_str}</b>\n"

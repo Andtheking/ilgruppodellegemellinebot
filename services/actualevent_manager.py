@@ -18,7 +18,7 @@ def populate_rolling_events_for_series(series: EventSerie, weeks_ahead: int = DE
     today = datetime.date.today()
     now = datetime.datetime.now()
 
-    if not series.is_active or series.end_date < today:
+    if not series.is_active or (series.end_date is not None and series.end_date < today):
         return 0
 
     target_horizon_date = today + datetime.timedelta(weeks = weeks_ahead)
@@ -85,7 +85,7 @@ def sync_all_active_series() -> int:
 
     for serie in active_series:
         total_created += populate_rolling_events_for_series(serie)
-        if serie.end_date < datetime.date.today():
+        if serie.end_date is not None and serie.end_date < datetime.date.today():
             serie.is_active = False
             serie.save(only=[EventSerie.is_active])
 

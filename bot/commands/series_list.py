@@ -1,3 +1,4 @@
+import html
 from collections import defaultdict
 from typing import Dict, List, Optional, Tuple
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
@@ -82,10 +83,11 @@ def build_day_schedule_dashboard(
         tot_eps = f"/{event.anilist_anime.total_episodes}" if event.anilist_anime and event.anilist_anime.total_episodes else ""
         ep_info = f"ep. {event.current_episode}{tot_eps}"
 
+        escaped_title = html.escape(title)
         if event.anilist_anime:
-            title_display = f'<a href="https://anilist.co/anime/{event.anilist_anime.anilist_media_id}">{title}</a>'
+            title_display = f'<a href="https://anilist.co/anime/{event.anilist_anime.anilist_media_id}">{escaped_title}</a>'
         else:
-            title_display = title
+            title_display = escaped_title
 
         if event.chat.id != chat_id:
             title_display = f"🤝 {title_display}"

@@ -48,7 +48,7 @@ class EventSerie(BaseModel):
     default_remind_time = TimeField() 
     day_of_week = SmallIntegerField() # 0 (Monday) --> 6 (Sunday)
     start_date = DateField()
-    end_date = DateField()
+    end_date = DateField(null=True)
     is_active = BooleanField(default = True)
     anilist_anime = ForeignKeyField(AnilistAnime, null=True, backref='series')
     current_episode = IntegerField(default=1)

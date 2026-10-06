@@ -137,7 +137,7 @@ async def serie_anilist_skip(update: Update, context: ContextTypes.DEFAULT_TYPE)
     context.user_data["new_serie"]["anilist_anime"] = None
 
     await update.message.reply_text(
-        "✅ Trovato: <b>{anime_data['title']}</b>. Da quale <b>episodio</b> si parte? (Default: <code>1</code>)\n"
+        "Nessun collegamento ad AniList. Da quale <b>episodio</b> si parte? (Default: <code>1</code>)\n"
         "<i>Invia il numero o scrivi /skip per partire da 1:</i>",
         parse_mode="HTML"
     )
@@ -252,14 +252,17 @@ async def set_end_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
     raw_input = update.message.text.strip().lower()
     end_date = None
 
-    try:
-        end_date = datetime.datetime.strptime(raw_input, "%Y-%m-%d").date()
-        if end_date < context.user_data["new_serie"]["start_date"]:
-            await update.message.reply_text("La data di fine non può essere precedente alla data di inizio. Riprova:")
+    if raw_input in ["nessuna", "nessuno", "no", "skip", "/skip"]:
+        end_date = None
+    else:
+        try:
+            end_date = datetime.datetime.strptime(raw_input, "%Y-%m-%d").date()
+            if end_date < context.user_data["new_serie"]["start_date"]:
+                await update.message.reply_text("La data di fine non può essere precedente alla data di inizio. Riprova:")
+                return ASK_END_DATE
+        except ValueError:
+            await update.message.reply_text("Formato data non valido. Usa YYYY-MM-DD oppure scrivi <code>nessuna</code>:", parse_mode="HTML")
             return ASK_END_DATE
-    except ValueError:
-        await update.message.reply_text("Formato data non valido. Usa YYYY-MM-DD oppure scrivi <code>nessuna</code>:", parse_mode="HTML")
-        return ASK_END_DATE
 
     data: Dict = context.user_data["new_serie"]
 
@@ -277,7 +280,7 @@ async def set_end_date(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
     context.user_data.clear()
 
-    end_date_str = end_date.strftime('%Y-%m-%d')
+    end_date_str = end_date.strftime('%Y-%m-%d') if end_date else "Nessuna data di fine"
     anilist_str = f"\n🔗 <b>AniList:</b> Collegato" if serie.anilist_anime else ""
     ep_str = f"\n🔢 <b>Episodio di partenza:</b> {serie.current_episode}"
     
@@ -329,7 +332,10 @@ create_series_handler = ConversationHandler(
         ASK_EVENT_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, middleware(set_event_time))],
         ASK_REMIND_TIME: [MessageHandler(filters.TEXT & ~filters.COMMAND, middleware(set_remind_time))],
         ASK_START_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, middleware(set_start_date))],
-        ASK_END_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, middleware(set_end_date))],
+        ASK_END_DATE: [
+            MessageHandler(filters.TEXT & ~filters.COMMAND, middleware(set_end_date)),
+            CommandHandler("skip", middleware(set_end_date)),
+        ],
     },
     fallbacks=[CommandHandler("cancel", cancel_creation)],
     allow_reentry=True,
