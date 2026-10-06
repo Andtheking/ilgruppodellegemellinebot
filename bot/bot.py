@@ -97,7 +97,7 @@ def start_bot():
         "createSeriesPublic": CustomCommandHandler('newserie', callback=middleware(new_serie_group_entry)),
         "createSeriesPrivate": create_series_handler,
         "getSeries": CustomCommandHandler("series", callback=middleware(list_series_command)),
-        "subCallback": CallbackQueryHandler(middleware(subscription_callback_handler), pattern=r"^(show_day|toggle_sub):"),
+        "subCallback": CallbackQueryHandler(middleware(subscription_callback_handler), pattern=r"^(show_day|toggle_sub|manage_serie|confirm_skip|do_skip|confirm_del|do_del):"),
         "setAnilist": CustomCommandHandler("set_anilist", other="(?P<profile>.+)", callback=middleware(set_anilist_command)),
         "share_callback": CallbackQueryHandler(share_link_callback, pattern=r"^share_link:",),
     }

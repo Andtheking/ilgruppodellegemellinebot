@@ -1,5 +1,5 @@
 import datetime
-from typing import List
+from typing import List, Optional
 from models.models import db, EventSerie, ActualEvent
 from peewee import fn
 
@@ -90,3 +90,30 @@ def sync_all_active_series() -> int:
             serie.save(only=[EventSerie.is_active])
 
     return total_created
+
+
+def get_next_actual_event(serie_id: int) -> Optional[ActualEvent]:
+    """_Fetches the next upcoming pending actual event for a given series._"""
+    now = datetime.datetime.now()
+    return (
+        ActualEvent
+        .select()
+        .where(
+            (ActualEvent.event_serie == serie_id) &
+            (ActualEvent.status == 'PENDING') &
+            (ActualEvent.event_datetime >= now)
+        )
+        .order_by(ActualEvent.event_datetime.asc())
+        .first()
+    )
+
+
+def skip_actual_event(event_id: int) -> Optional[ActualEvent]:
+    """_Marks an upcoming actual event as SKIPPED so no reminder is dispatched._"""
+    event = ActualEvent.get_or_none(ActualEvent.id == event_id)
+    if not event:
+        return None
+
+    event.status = 'SKIPPED'
+    event.save(only=[ActualEvent.status])
+    return event

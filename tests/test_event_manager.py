@@ -3,11 +3,11 @@ import pytest
 import os
 from peewee import SqliteDatabase
 
-from models.models import User, Chat, EventSerie, EventSerieSubscription, ActualEvent, AnilistAnime
+from models.models import User, Chat, EventSerie, EventSerieSubscription, ActualEvent, AnilistAnime, SharedEventSerie
 from services.actualevent_manager import populate_rolling_events_for_series, sync_all_active_series
 
 db_test = SqliteDatabase(':memory:', pragmas={'foreign_keys': 1})
-MODELS = [User, Chat, AnilistAnime, EventSerie, EventSerieSubscription, ActualEvent]
+MODELS = [User, Chat, AnilistAnime, EventSerie, EventSerieSubscription, ActualEvent, SharedEventSerie]
 WEEKS_AHEAD = 4
 
 @pytest.fixture(autouse=True)
@@ -116,3 +116,91 @@ def test_user_mention_html_escaping():
     mention = format_user_mention(user_with_tags)
     assert "&lt;hacker&gt;&amp;co" in mention
     assert "<hacker>" not in mention
+
+def test_delete_series_as_owner():
+    """Deleting a series as owner removes the series and related events/subscriptions."""
+    from services.eventseries_manager import delete_or_unlink_series
+    chat = Chat.create(id=301, title="Owner Chat")
+    user = User.create(id=501, username="sub_user")
+    today = datetime.date.today()
+
+    series = EventSerie.create(
+        chat=chat,
+        title="Owner Serie",
+        default_event_time=datetime.time(21, 00),
+        default_remind_time=datetime.time(20, 00),
+        day_of_week=today.weekday(),
+        start_date=today,
+        end_date=None,
+        is_active=True
+    )
+    populate_rolling_events_for_series(series)
+    EventSerieSubscription.create(event_serie=series, user=user)
+
+    result, title = delete_or_unlink_series(series.id, chat.id)
+    assert result == "deleted"
+    assert title == "Owner Serie"
+    assert EventSerie.get_or_none(EventSerie.id == series.id) is None
+    assert ActualEvent.select().where(ActualEvent.event_serie == series.id).count() == 0
+    assert EventSerieSubscription.select().where(EventSerieSubscription.event_serie == series.id).count() == 0
+
+def test_unlink_shared_series():
+    """Unlinking a shared series removes only the shared relationship for that chat."""
+    from services.eventseries_manager import delete_or_unlink_series
+    owner_chat = Chat.create(id=401, title="Original Owner")
+    guest_chat = Chat.create(id=402, title="Guest Group")
+    today = datetime.date.today()
+
+    series = EventSerie.create(
+        chat=owner_chat,
+        title="Shared Serie",
+        default_event_time=datetime.time(21, 00),
+        default_remind_time=datetime.time(20, 00),
+        day_of_week=today.weekday(),
+        start_date=today,
+        end_date=None,
+        is_active=True
+    )
+    SharedEventSerie.create(event_serie=series, chat=guest_chat)
+
+    result, title = delete_or_unlink_series(series.id, guest_chat.id)
+    assert result == "unlinked"
+    assert title == "Shared Serie"
+    # Series still exists for the owner
+    assert EventSerie.get_or_none(EventSerie.id == series.id) is not None
+    # Shared link for guest chat is gone
+    assert SharedEventSerie.get_or_none((SharedEventSerie.event_serie == series) & (SharedEventSerie.chat == guest_chat)) is None
+
+def test_skip_actual_event():
+    """Skipping an actual event sets status to SKIPPED and excludes it from due reminders."""
+    from services.actualevent_manager import get_next_actual_event, skip_actual_event
+    from services.notification_service import get_due_reminders
+    chat = Chat.create(id=501, title="Skip Test Chat")
+    today = datetime.date.today()
+
+    series = EventSerie.create(
+        chat=chat,
+        title="Skip Serie",
+        default_event_time=datetime.time(21, 00),
+        default_remind_time=datetime.time(20, 00),
+        day_of_week=today.weekday(),
+        start_date=today,
+        end_date=None,
+        is_active=True
+    )
+    populate_rolling_events_for_series(series)
+
+    next_event = get_next_actual_event(series.id)
+    assert next_event is not None
+    assert next_event.status == "PENDING"
+
+    skipped = skip_actual_event(next_event.id)
+    assert skipped is not None
+    assert skipped.status == "SKIPPED"
+
+    # Due reminders should not include SKIPPED events even if remind_datetime is past
+    skipped.remind_datetime = datetime.datetime.now() - datetime.timedelta(minutes=5)
+    skipped.save()
+    due = get_due_reminders()
+    due_ids = [e.id for e, _ in due]
+    assert skipped.id not in due_ids

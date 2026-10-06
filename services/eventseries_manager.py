@@ -1,6 +1,6 @@
 import datetime
 from typing import Optional, Tuple, Union
-from models.models import Chat, EventSerie, AnilistAnime, db
+from models.models import Chat, EventSerie, AnilistAnime, SharedEventSerie, EventSerieSubscription, ActualEvent, db
 from services.actualevent_manager import populate_rolling_events_for_series
 
 
@@ -49,3 +49,40 @@ def create_series_with_events(
         events_count = populate_rolling_events_for_series(serie)
 
     return serie, events_count
+
+
+def delete_or_unlink_series(serie_id: int, chat_id: int) -> Tuple[str, str]:
+    """_Deletes an event series if the chat is the owner, or unlinks it if the chat is a shared participant._
+
+    Args:
+        serie_id (int): _The ID of the series._
+        chat_id (int): _The ID of the requesting chat._
+
+    Returns:
+        Tuple[str, str]: _("deleted" | "unlinked" | "not_found", title of the series)_
+    """
+    serie = EventSerie.get_or_none(EventSerie.id == serie_id)
+    if not serie:
+        return "not_found", ""
+
+    title = serie.title
+    if serie.chat_id != chat_id:
+        deleted_rows = (
+            SharedEventSerie
+            .delete()
+            .where(
+                (SharedEventSerie.event_serie == serie) &
+                (SharedEventSerie.chat == chat_id)
+            )
+            .execute()
+        )
+        if deleted_rows > 0:
+            return "unlinked", title
+        return "not_found", title
+    else:
+        with db.atomic():
+            ActualEvent.delete().where(ActualEvent.event_serie == serie).execute()
+            EventSerieSubscription.delete().where(EventSerieSubscription.event_serie == serie).execute()
+            SharedEventSerie.delete().where(SharedEventSerie.event_serie == serie).execute()
+            serie.delete_instance()
+        return "deleted", title
