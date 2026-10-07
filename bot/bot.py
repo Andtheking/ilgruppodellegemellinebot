@@ -32,6 +32,7 @@ from bot.ephimeral_patch.EphemeralBot import EphemeralExtBot
 from bot.ephimeral_patch.EphemeralContext import EphemeralContext, EphemeralContextTypes
 
 from bot.commands.create_series import create_series_handler, new_serie_group_entry
+from bot.commands.force_sub import force_sub_command, force_unsub_command, force_sub_pick_callback
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -97,7 +98,10 @@ def start_bot():
         "createSeriesPublic": CustomCommandHandler('newserie', callback=middleware(new_serie_group_entry)),
         "createSeriesPrivate": create_series_handler,
         "getSeries": CustomCommandHandler("series", callback=middleware(list_series_command)),
-        "subCallback": CallbackQueryHandler(middleware(subscription_callback_handler), pattern=r"^(show_day|toggle_sub|manage_serie|confirm_skip|do_skip|confirm_del|do_del):"),
+        "forceSub": CustomCommandHandler("force_sub", other='(?P<args>.+)?', callback=middleware(force_sub_command)),
+        "forceUnsub": CustomCommandHandler("force_unsub", other='(?P<args>.+)?', callback=middleware(force_unsub_command)),
+        "forceSubPick": CallbackQueryHandler(force_sub_pick_callback, pattern=r"^(force_sub_pick|force_unsub_pick):"),
+        "subCallback": CallbackQueryHandler(middleware(subscription_callback_handler), pattern=r"^(show_day|toggle_sub|manage_serie|confirm_skip|do_skip|confirm_del|do_del|manage_subs|force_unsub_btn):"),
         "setAnilist": CustomCommandHandler("set_anilist", other="(?P<profile>.+)", callback=middleware(set_anilist_command)),
         "share_callback": CallbackQueryHandler(share_link_callback, pattern=r"^share_link:",),
     }

@@ -4,7 +4,7 @@ from typing import Dict, List, Optional, Tuple
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 from models.models import Chat, EventSerie, SharedEventSerie, ActualEvent
-from services.subscribe_to_eventseries import get_series_subscribers, toggle_subscription
+from services.subscribe_to_eventseries import get_series_subscribers, toggle_subscription, force_unsubscribe_user
 from services.eventseries_manager import delete_or_unlink_series
 from services.actualevent_manager import get_next_actual_event, skip_actual_event
 from bot.utils.checks import is_user_groupadmin
@@ -179,6 +179,46 @@ async def list_series_command(update: Update, context: EphemeralContext) -> None
     )
 
 
+async def render_manage_subs(
+    context: ContextTypes.DEFAULT_TYPE,
+    query,
+    chat_id: int,
+    user_id: int,
+    serie_id: int,
+    selected_day: int
+) -> None:
+    serie = EventSerie.get_or_none(EventSerie.id == serie_id)
+    if not serie:
+        await query.answer("Serie non trovata.", show_alert=True)
+        return
+
+    subs = get_series_subscribers(serie.id)
+    escaped_title = html.escape(serie.title)
+
+    if subs:
+        user_lines = [f"• <b>{html.escape(u.username or f'ID {u.id}')}</b>" for u in subs]
+        sub_list_text = "\n".join(user_lines)
+    else:
+        sub_list_text = "<i>Nessun utente attualmente iscritto.</i>"
+
+    text = (
+        f"👥 <b>ISCRITTI A {escaped_title}</b> ({len(subs)})\n\n"
+        f"{sub_list_text}\n\n"
+        f"<i>Tocca ❌ accanto a un nome per rimuoverlo.\n"
+        f"Per iscrivere qualcuno usa:</i>\n"
+        f"<code>/force_sub {html.escape(serie.title)} @username</code>"
+    )
+
+    buttons: List[List[InlineKeyboardButton]] = []
+    for u in subs:
+        btn_label = f"❌ {u.username}" if u.username else f"❌ ID {u.id}"
+        buttons.append([InlineKeyboardButton(btn_label, callback_data=f"force_unsub_btn:{serie.id}:{u.id}:{selected_day}")])
+
+    buttons.append([InlineKeyboardButton("🔙 Torna a gestione serie", callback_data=f"manage_serie:{serie.id}:{selected_day}")])
+
+    await edit_ephemeral_view(context, query, chat_id, user_id, text, InlineKeyboardMarkup(buttons))
+
+
 async def subscription_callback_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """_Handles schedule dashboard navigation, subscriptions, and series administration._"""
     query = update.callback_query
@@ -247,7 +287,10 @@ async def subscription_callback_handler(update: Update, context: ContextTypes.DE
             f"<i>Scegli un'operazione qui sotto:</i>"
         )
 
+        subs = get_series_subscribers(serie.id)
+
         buttons: List[List[InlineKeyboardButton]] = []
+        buttons.append([InlineKeyboardButton(f"👥 Iscritti ({len(subs)})", callback_data=f"manage_subs:{serie.id}:{selected_day}")])
         if next_event:
             buttons.append([InlineKeyboardButton("⏭️ Salta prossimo appuntamento", callback_data=f"confirm_skip:{next_event.id}:{selected_day}")])
         if is_owner:
@@ -259,6 +302,36 @@ async def subscription_callback_handler(update: Update, context: ContextTypes.DE
 
         await query.answer()
         await edit_ephemeral_view(context, query, chat_id, user_tg.id, text, InlineKeyboardMarkup(buttons))
+        return
+
+    elif action == "manage_subs":
+        if not await is_user_groupadmin(update, context):
+            await query.answer("Solo gli amministratori possono gestire gli iscritti.", show_alert=True)
+            return
+
+        serie_id = int(data_parts[1])
+        selected_day = int(data_parts[2]) if len(data_parts) > 2 else 0
+
+        await query.answer()
+        await render_manage_subs(context, query, chat_id, user_tg.id, serie_id, selected_day)
+        return
+
+    elif action == "force_unsub_btn":
+        if not await is_user_groupadmin(update, context):
+            await query.answer("Solo gli amministratori possono gestire gli iscritti.", show_alert=True)
+            return
+
+        serie_id = int(data_parts[1])
+        target_user_id = int(data_parts[2])
+        selected_day = int(data_parts[3]) if len(data_parts) > 3 else 0
+
+        removed, title = force_unsubscribe_user(target_user_id, serie_id)
+        if removed:
+            await query.answer("Utente rimosso dall'evento!", show_alert=False)
+        else:
+            await query.answer("Utente non iscritto.", show_alert=False)
+
+        await render_manage_subs(context, query, chat_id, user_tg.id, serie_id, selected_day)
         return
 
     elif action == "confirm_skip":

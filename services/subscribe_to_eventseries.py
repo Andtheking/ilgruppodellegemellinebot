@@ -1,7 +1,5 @@
-# services/subscription_service.py
-from typing import Tuple, List
-
-from models.models import User, EventSerie, EventSerieSubscription
+from typing import Tuple, List, Optional
+from models.models import User, EventSerie, EventSerieSubscription, SharedEventSerie
 
 def toggle_subscription(user_id: int, username: str, serie_id: int) -> Tuple[bool, str]:
     """_Toggles a user's subscription status for an event series._
@@ -46,3 +44,59 @@ def get_series_subscribers(serie_id: int) -> List[User]:
         .join(EventSerieSubscription)
         .where(EventSerieSubscription.event_serie == serie_id)
     )
+
+
+def force_subscribe_user(user_id: int, serie_id: int) -> Tuple[bool, str]:
+    """_Forcefully subscribes a user to an event series if not already subscribed._
+
+    Returns:
+        Tuple[bool, str]: _(was_newly_created, serie_title)_
+    """
+    user = User.get_by_id(user_id)
+    serie = EventSerie.get_by_id(serie_id)
+    _, created = EventSerieSubscription.get_or_create(
+        event_serie=serie,
+        user=user
+    )
+    return created, serie.title
+
+
+def force_unsubscribe_user(user_id: int, serie_id: int) -> Tuple[bool, str]:
+    """_Forcefully un-subscribes a user from an event series._
+
+    Returns:
+        Tuple[bool, str]: _(was_removed, serie_title)_
+    """
+    serie = EventSerie.get_or_none(EventSerie.id == serie_id)
+    if not serie:
+        return False, ""
+
+    deleted = (
+        EventSerieSubscription
+        .delete()
+        .where(
+            (EventSerieSubscription.event_serie == serie) &
+            (EventSerieSubscription.user == user_id)
+        )
+        .execute()
+    )
+    return (deleted > 0), serie.title
+
+
+def search_active_series_for_chat(chat_id: int, query: Optional[str] = None) -> List[EventSerie]:
+    """_Returns active series available in a chat, optionally filtered by title substring._"""
+    base_query = (
+        EventSerie.select()
+        .left_outer_join(SharedEventSerie, on=(SharedEventSerie.event_serie == EventSerie.id))
+        .where(
+            (EventSerie.is_active == True) &
+            ((EventSerie.chat == chat_id) | (SharedEventSerie.chat == chat_id))
+        )
+        .order_by(EventSerie.title.asc())
+        .distinct()
+    )
+    if not query:
+        return list(base_query)
+
+    clean_query = query.strip().lower()
+    return [s for s in base_query if clean_query in s.title.lower()]

@@ -204,3 +204,82 @@ def test_skip_actual_event():
     due = get_due_reminders()
     due_ids = [e.id for e, _ in due]
     assert skipped.id not in due_ids
+
+
+def test_force_subscribe_and_unsubscribe():
+    """Admin can force subscribe and unsubscribe an existing user."""
+    from services.subscribe_to_eventseries import force_subscribe_user, force_unsubscribe_user, get_series_subscribers
+    chat = Chat.create(id=601, title="Force Sub Chat")
+    user = User.create(id=602, username="force_target")
+    today = datetime.date.today()
+
+    series = EventSerie.create(
+        chat=chat,
+        title="Weekly Anime",
+        default_event_time=datetime.time(21, 00),
+        default_remind_time=datetime.time(20, 00),
+        day_of_week=today.weekday(),
+        start_date=today,
+        end_date=None,
+        is_active=True
+    )
+
+    created, title = force_subscribe_user(user.id, series.id)
+    assert created is True
+    assert title == "Weekly Anime"
+    assert any(u.id == user.id for u in get_series_subscribers(series.id))
+
+    # Second call should not duplicate
+    created_again, _ = force_subscribe_user(user.id, series.id)
+    assert created_again is False
+
+    # Unsubscribe
+    removed, _ = force_unsubscribe_user(user.id, series.id)
+    assert removed is True
+    assert not any(u.id == user.id for u in get_series_subscribers(series.id))
+
+
+def test_search_active_series_for_chat():
+    """search_active_series_for_chat filters active series by query."""
+    from services.subscribe_to_eventseries import search_active_series_for_chat
+    chat = Chat.create(id=701, title="Search Chat")
+    today = datetime.date.today()
+
+    s1 = EventSerie.create(
+        chat=chat,
+        title="Frieren Watchparty",
+        default_event_time=datetime.time(21, 00),
+        default_remind_time=datetime.time(20, 00),
+        day_of_week=today.weekday(),
+        start_date=today,
+        end_date=None,
+        is_active=True
+    )
+    s2 = EventSerie.create(
+        chat=chat,
+        title="Dungeon Meshi",
+        default_event_time=datetime.time(21, 00),
+        default_remind_time=datetime.time(20, 00),
+        day_of_week=today.weekday(),
+        start_date=today,
+        end_date=None,
+        is_active=True
+    )
+    # Inactive serie
+    s3 = EventSerie.create(
+        chat=chat,
+        title="Old Frieren",
+        default_event_time=datetime.time(21, 00),
+        default_remind_time=datetime.time(20, 00),
+        day_of_week=today.weekday(),
+        start_date=today,
+        end_date=None,
+        is_active=False
+    )
+
+    results = search_active_series_for_chat(chat.id, "frieren")
+    assert len(results) == 1
+    assert results[0].id == s1.id
+
+    all_active = search_active_series_for_chat(chat.id)
+    assert len(all_active) == 2
