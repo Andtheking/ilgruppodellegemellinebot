@@ -32,6 +32,7 @@ from bot.ephimeral_patch.EphemeralBot import EphemeralExtBot
 from bot.ephimeral_patch.EphemeralContext import EphemeralContext, EphemeralContextTypes
 
 from bot.commands.create_series import create_series_handler, new_serie_group_entry
+from bot.commands.edit_series import edit_series_handler
 from bot.commands.force_sub import force_sub_command, force_unsub_command, force_sub_pick_callback
 
 
@@ -90,13 +91,14 @@ def start_bot():
     application = ApplicationBuilder().bot(EphemeralExtBot(bot_config.TOKEN)).context_types(ContextTypes(context=EphemeralContext)).build()
     
     handlers = {
-        "start": CommandHandler("start", middleware(start), filters=~filters.Regex(r"share_") & ~filters.ChatType.GROUPS),
+        "start": CommandHandler("start", middleware(start), filters=~filters.Regex(r"(share_|newserie_|editserie_)") & ~filters.ChatType.GROUPS),
         "start_group": CommandHandler('start', middleware(handle_group_start), filters=filters.ChatType.GROUPS & filters.Regex(r"share_")),
         "help": CustomCommandHandler('help',middleware(help)),
         "addAdmin": CustomCommandHandler('addAdmin', other='(?P<candidate>.+)?', callback=middleware(add_admin)),
         "removeAdmin": CustomCommandHandler('removeAdmin', other='(?P<candidate>.+)?', callback=middleware(remove_admin)),
         "createSeriesPublic": CustomCommandHandler('newserie', callback=middleware(new_serie_group_entry)),
         "createSeriesPrivate": create_series_handler,
+        "editSeriesPrivate": edit_series_handler,
         "getSeries": CustomCommandHandler("series", callback=middleware(list_series_command)),
         "forceSub": CustomCommandHandler("force_sub", other='(?P<args>.+)?', callback=middleware(force_sub_command)),
         "forceUnsub": CustomCommandHandler("force_unsub", other='(?P<args>.+)?', callback=middleware(force_unsub_command)),

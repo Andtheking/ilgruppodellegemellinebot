@@ -10,6 +10,7 @@ from services.actualevent_manager import get_next_actual_event, skip_actual_even
 from bot.utils.checks import is_user_groupadmin
 from bot.ephimeral_patch.EphemeralUtils import build_ephemeral_reply_context
 from bot.ephimeral_patch.EphemeralContext import EphemeralContext
+from bot.bot_config import bot_config
 from utils.log import log
 
 DAYS_NAME = ["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"]
@@ -294,6 +295,8 @@ async def subscription_callback_handler(update: Update, context: ContextTypes.DE
         if next_event:
             buttons.append([InlineKeyboardButton("⏭️ Salta prossimo appuntamento", callback_data=f"confirm_skip:{next_event.id}:{selected_day}")])
         if is_owner:
+            edit_link = f"https://t.me/{bot_config.BOT_USERNAME}?start=editserie_{serie.id}"
+            buttons.append([InlineKeyboardButton("✏️ Modifica serie", url=edit_link)])
             buttons.append([InlineKeyboardButton("📅 Sposta giorno", callback_data=f"change_day_menu:{serie.id}:{selected_day}")])
             buttons.append([InlineKeyboardButton("🔗 Condividi con altri gruppi", callback_data=f"share_link:{serie.id}")])
             buttons.append([InlineKeyboardButton("🗑️ Elimina serie intera", callback_data=f"confirm_del:{serie.id}:{selected_day}")])

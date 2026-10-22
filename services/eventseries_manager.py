@@ -125,3 +125,100 @@ def change_series_day_of_week(serie_id: int, new_day_of_week: int) -> Tuple[Opti
         events_created = populate_rolling_events_for_series(serie)
 
     return serie, events_created
+
+
+def update_series_times(
+    serie_id: int,
+    event_time: datetime.time,
+    remind_time: datetime.time
+) -> Tuple[Optional[EventSerie], int]:
+    """_Updates default event and reminder times, regenerating future pending events._"""
+    serie = EventSerie.get_or_none(EventSerie.id == serie_id)
+    if not serie:
+        return None, 0
+
+    now = datetime.datetime.now()
+    with db.atomic():
+        serie.default_event_time = event_time
+        serie.default_remind_time = remind_time
+        serie.save(only=[EventSerie.default_event_time, EventSerie.default_remind_time])
+
+        ActualEvent.delete().where(
+            (ActualEvent.event_serie == serie) &
+            (
+                (ActualEvent.status == 'PENDING') |
+                ((ActualEvent.status == 'SKIPPED') & (ActualEvent.event_datetime >= now))
+            )
+        ).execute()
+
+        events_created = populate_rolling_events_for_series(serie)
+
+    return serie, events_created
+
+
+def update_series_title(serie_id: int, title: str) -> Optional[EventSerie]:
+    """_Updates the title of an event series._"""
+    serie = EventSerie.get_or_none(EventSerie.id == serie_id)
+    if not serie:
+        return None
+
+    cleaned_title = title.strip()
+    if not cleaned_title:
+        return None
+
+    serie.title = cleaned_title
+    serie.save(only=[EventSerie.title])
+    return serie
+
+
+def update_series_episode(serie_id: int, current_episode: int) -> Optional[EventSerie]:
+    """_Updates the current episode index of an event series._"""
+    serie = EventSerie.get_or_none(EventSerie.id == serie_id)
+    if not serie:
+        return None
+
+    serie.current_episode = max(1, current_episode)
+    serie.save(only=[EventSerie.current_episode])
+    return serie
+
+
+def update_series_anilist(
+    serie_id: int,
+    anilist_anime: Optional[Union[AnilistAnime, int]]
+) -> Optional[EventSerie]:
+    """_Updates or removes the linked AniList anime for an event series._"""
+    serie = EventSerie.get_or_none(EventSerie.id == serie_id)
+    if not serie:
+        return None
+
+    serie.anilist_anime = anilist_anime
+    serie.save(only=[EventSerie.anilist_anime])
+    return serie
+
+
+def update_series_end_date(
+    serie_id: int,
+    end_date: Optional[datetime.date]
+) -> Tuple[Optional[EventSerie], int]:
+    """_Updates the termination date of an event series and adjusts pending events._"""
+    serie = EventSerie.get_or_none(EventSerie.id == serie_id)
+    if not serie:
+        return None, 0
+
+    now = datetime.datetime.now()
+    with db.atomic():
+        serie.end_date = end_date
+        serie.save(only=[EventSerie.end_date])
+
+        ActualEvent.delete().where(
+            (ActualEvent.event_serie == serie) &
+            (
+                (ActualEvent.status == 'PENDING') |
+                ((ActualEvent.status == 'SKIPPED') & (ActualEvent.event_datetime >= now))
+            )
+        ).execute()
+
+        events_created = populate_rolling_events_for_series(serie)
+
+    return serie, events_created
+

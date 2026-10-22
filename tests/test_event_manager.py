@@ -411,3 +411,145 @@ def test_change_series_day_of_week_non_existent():
     serie, count = change_series_day_of_week(999999, 1)
     assert serie is None
     assert count == 0
+
+
+def test_update_series_times():
+    """Verify that updating series times changes defaults and pending actual events."""
+    from services.eventseries_manager import update_series_times
+    chat = Chat.create(id=901, title="Times Chat")
+    today = datetime.date.today()
+    series = EventSerie.create(
+        chat=chat,
+        title="Times Test",
+        default_event_time=datetime.time(20, 00),
+        default_remind_time=datetime.time(19, 00),
+        day_of_week=today.weekday(),
+        start_date=today,
+        end_date=None,
+        is_active=True
+    )
+    populate_rolling_events_for_series(series)
+
+    new_event_time = datetime.time(22, 15)
+    new_remind_time = datetime.time(21, 15)
+    updated, count = update_series_times(series.id, new_event_time, new_remind_time)
+
+    assert updated is not None
+    assert updated.default_event_time == new_event_time
+    assert updated.default_remind_time == new_remind_time
+    assert count > 0
+
+    for ev in ActualEvent.select().where(ActualEvent.event_serie == series):
+        assert ev.event_datetime.time() == new_event_time
+        assert ev.remind_datetime.time() == new_remind_time
+
+
+def test_update_series_title():
+    """Verify title updates and validation."""
+    from services.eventseries_manager import update_series_title
+    chat = Chat.create(id=902, title="Title Chat")
+    today = datetime.date.today()
+    series = EventSerie.create(
+        chat=chat,
+        title="Old Title",
+        default_event_time=datetime.time(21, 00),
+        default_remind_time=datetime.time(20, 00),
+        day_of_week=today.weekday(),
+        start_date=today,
+        end_date=None,
+        is_active=True
+    )
+
+    updated = update_series_title(series.id, "New Wonderful Title")
+    assert updated is not None
+    assert updated.title == "New Wonderful Title"
+    assert EventSerie.get_by_id(series.id).title == "New Wonderful Title"
+
+    # Empty title returns None and does not change title
+    assert update_series_title(series.id, "   ") is None
+    assert EventSerie.get_by_id(series.id).title == "New Wonderful Title"
+
+
+def test_update_series_episode():
+    """Verify current episode index update."""
+    from services.eventseries_manager import update_series_episode
+    chat = Chat.create(id=903, title="Episode Chat")
+    today = datetime.date.today()
+    series = EventSerie.create(
+        chat=chat,
+        title="Ep Test",
+        default_event_time=datetime.time(21, 00),
+        default_remind_time=datetime.time(20, 00),
+        day_of_week=today.weekday(),
+        start_date=today,
+        end_date=None,
+        is_active=True,
+        current_episode=1
+    )
+
+    updated = update_series_episode(series.id, 12)
+    assert updated is not None
+    assert updated.current_episode == 12
+    assert EventSerie.get_by_id(series.id).current_episode == 12
+
+    # Negative episode defaults to 1
+    update_series_episode(series.id, -5)
+    assert EventSerie.get_by_id(series.id).current_episode == 1
+
+
+def test_update_series_anilist():
+    """Verify attaching and detaching AniList anime."""
+    from services.eventseries_manager import update_series_anilist
+    chat = Chat.create(id=904, title="AniList Chat")
+    today = datetime.date.today()
+    anime = AnilistAnime.create(anilist_media_id=99999, total_episodes=24)
+    series = EventSerie.create(
+        chat=chat,
+        title="Ani Test",
+        default_event_time=datetime.time(21, 00),
+        default_remind_time=datetime.time(20, 00),
+        day_of_week=today.weekday(),
+        start_date=today,
+        end_date=None,
+        is_active=True,
+        anilist_anime=None
+    )
+
+    # Attach
+    updated = update_series_anilist(series.id, anime)
+    assert updated is not None
+    assert updated.anilist_anime_id == anime.anilist_media_id
+
+    # Detach
+    detached = update_series_anilist(series.id, None)
+    assert detached is not None
+    assert detached.anilist_anime is None
+
+
+def test_update_series_end_date():
+    """Verify updating end date recalculates rolling events."""
+    from services.eventseries_manager import update_series_end_date
+    chat = Chat.create(id=905, title="End Date Chat")
+    today = datetime.date.today()
+    series = EventSerie.create(
+        chat=chat,
+        title="End Date Test",
+        default_event_time=datetime.time(21, 00),
+        default_remind_time=datetime.time(20, 00),
+        day_of_week=today.weekday(),
+        start_date=today,
+        end_date=None,
+        is_active=True
+    )
+    populate_rolling_events_for_series(series)
+
+    # Set end_date to 1 week from now
+    target_end = today + datetime.timedelta(days=7)
+    updated, count = update_series_end_date(series.id, target_end)
+    assert updated is not None
+    assert updated.end_date == target_end
+
+    events = list(ActualEvent.select().where(ActualEvent.event_serie == series))
+    for ev in events:
+        assert ev.event_datetime.date() <= target_end
+
