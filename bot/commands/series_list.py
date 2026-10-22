@@ -5,7 +5,7 @@ from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
 from telegram.ext import ContextTypes
 from models.models import Chat, EventSerie, SharedEventSerie, ActualEvent
 from services.subscribe_to_eventseries import get_series_subscribers, toggle_subscription, force_unsubscribe_user
-from services.eventseries_manager import delete_or_unlink_series
+from services.eventseries_manager import delete_or_unlink_series, change_series_day_of_week
 from services.actualevent_manager import get_next_actual_event, skip_actual_event
 from bot.utils.checks import is_user_groupadmin
 from bot.ephimeral_patch.EphemeralUtils import build_ephemeral_reply_context
@@ -150,7 +150,7 @@ def build_day_schedule_dashboard(
         keyboard_rows.append(current_btn_row)
 
     if is_admin:
-        lines.append("\n<i>Tocca 🔔/🔕 per iscriverti, ⚙️ Gestisci per opzioni admin (skip appuntamenti o eliminazione).</i>")
+        lines.append("\n<i>Tocca 🔔/🔕 per iscriverti, ⚙️ Gestisci per opzioni admin (skip, cambio giorno o eliminazione).</i>")
     else:
         lines.append("\n<i>Tocca i pulsanti sopra per cambiare giorno, sotto per iscriverti (🔔) o disiscriverti (🔕).</i>")
 
@@ -294,6 +294,7 @@ async def subscription_callback_handler(update: Update, context: ContextTypes.DE
         if next_event:
             buttons.append([InlineKeyboardButton("⏭️ Salta prossimo appuntamento", callback_data=f"confirm_skip:{next_event.id}:{selected_day}")])
         if is_owner:
+            buttons.append([InlineKeyboardButton("📅 Sposta giorno", callback_data=f"change_day_menu:{serie.id}:{selected_day}")])
             buttons.append([InlineKeyboardButton("🔗 Condividi con altri gruppi", callback_data=f"share_link:{serie.id}")])
             buttons.append([InlineKeyboardButton("🗑️ Elimina serie intera", callback_data=f"confirm_del:{serie.id}:{selected_day}")])
         else:
@@ -454,6 +455,148 @@ async def subscription_callback_handler(update: Update, context: ContextTypes.DE
             [InlineKeyboardButton("📅 Torna al palinsesto", callback_data=f"show_day:{selected_day}")],
         ]
         await query.answer(text="Operazione completata!", show_alert=False)
+        await edit_ephemeral_view(context, query, chat_id, user_tg.id, text, InlineKeyboardMarkup(buttons))
+        return
+
+    elif action == "change_day_menu":
+        if not await is_user_groupadmin(update, context):
+            await query.answer("Solo gli amministratori possono gestire le serie.", show_alert=True)
+            return
+
+        serie_id = int(data_parts[1])
+        selected_day = int(data_parts[2]) if len(data_parts) > 2 else 0
+
+        serie = EventSerie.get_or_none(EventSerie.id == serie_id)
+        if not serie:
+            await query.answer("Serie non trovata.", show_alert=True)
+            return
+
+        if serie.chat_id != chat_id:
+            await query.answer("Solo il gruppo proprietario può cambiare il giorno della serie.", show_alert=True)
+            return
+
+        escaped_title = html.escape(serie.title)
+        curr_day_name = DAYS_NAME[serie.day_of_week]
+        time_str = serie.default_event_time.strftime("%H:%M")
+
+        text = (
+            f"📅 <b>SPOSTA GIORNO DELLA SETTIMANA</b>\n\n"
+            f"🎬 Serie: <b>{escaped_title}</b>\n"
+            f"🗓️ Programmazione attuale: <b>Ogni {curr_day_name} alle <code>{time_str}</code></b>\n\n"
+            f"<i>Seleziona il nuovo giorno in cui trasmettere la serie:</i>"
+        )
+
+        buttons: List[List[InlineKeyboardButton]] = []
+        day_buttons: List[InlineKeyboardButton] = []
+        for idx, name in enumerate(DAYS_NAME):
+            if idx == serie.day_of_week:
+                day_buttons.append(InlineKeyboardButton(f"• {name} (Attuale) •", callback_data=f"noop_curr_day:{serie.id}"))
+            else:
+                day_buttons.append(InlineKeyboardButton(name, callback_data=f"confirm_change_day:{serie.id}:{idx}:{selected_day}"))
+
+            if len(day_buttons) == 2:
+                buttons.append(day_buttons)
+                day_buttons = []
+
+        if day_buttons:
+            buttons.append(day_buttons)
+
+        buttons.append([InlineKeyboardButton("🔙 Annulla", callback_data=f"manage_serie:{serie.id}:{selected_day}")])
+
+        await query.answer()
+        await edit_ephemeral_view(context, query, chat_id, user_tg.id, text, InlineKeyboardMarkup(buttons))
+        return
+
+    elif action == "noop_curr_day":
+        await query.answer("È già il giorno attualmente impostato per questa serie.", show_alert=False)
+        return
+
+    elif action == "confirm_change_day":
+        if not await is_user_groupadmin(update, context):
+            await query.answer("Solo gli amministratori possono gestire le serie.", show_alert=True)
+            return
+
+        serie_id = int(data_parts[1])
+        new_day = int(data_parts[2])
+        selected_day = int(data_parts[3]) if len(data_parts) > 3 else 0
+
+        serie = EventSerie.get_or_none(EventSerie.id == serie_id)
+        if not serie:
+            await query.answer("Serie non trovata.", show_alert=True)
+            return
+
+        if serie.chat_id != chat_id:
+            await query.answer("Solo il gruppo proprietario può cambiare il giorno della serie.", show_alert=True)
+            return
+
+        escaped_title = html.escape(serie.title)
+        old_day_name = DAYS_NAME[serie.day_of_week]
+        new_day_name = DAYS_NAME[new_day]
+        time_str = serie.default_event_time.strftime("%H:%M")
+
+        text = (
+            f"⚠️ <b>CONFERMA SPOSTAMENTO GIORNO</b>\n\n"
+            f"Sei sicuro di voler spostare la serie <b>{escaped_title}</b>?\n\n"
+            f"• <b>Giorno precedente:</b> {old_day_name} alle <code>{time_str}</code>\n"
+            f"• <b>Nuovo giorno:</b> {new_day_name} alle <code>{time_str}</code>\n\n"
+            f"ℹ️ <i>Tutti gli appuntamenti futuri non ancora svolti verranno riprogrammati per ogni {new_day_name}.</i>"
+        )
+
+        buttons = [
+            [InlineKeyboardButton(f"✅ Conferma spostamento a {new_day_name}", callback_data=f"do_change_day:{serie.id}:{new_day}:{selected_day}")],
+            [InlineKeyboardButton("🔙 Annulla", callback_data=f"change_day_menu:{serie.id}:{selected_day}")],
+        ]
+
+        await query.answer()
+        await edit_ephemeral_view(context, query, chat_id, user_tg.id, text, InlineKeyboardMarkup(buttons))
+        return
+
+    elif action == "do_change_day":
+        if not await is_user_groupadmin(update, context):
+            await query.answer("Solo gli amministratori possono eseguire questa azione.", show_alert=True)
+            return
+
+        serie_id = int(data_parts[1])
+        new_day = int(data_parts[2])
+        selected_day = int(data_parts[3]) if len(data_parts) > 3 else 0
+
+        serie = EventSerie.get_or_none(EventSerie.id == serie_id)
+        if not serie:
+            await query.answer("Serie non trovata.", show_alert=True)
+            return
+
+        if serie.chat_id != chat_id:
+            await query.answer("Solo il gruppo proprietario può cambiare il giorno della serie.", show_alert=True)
+            return
+
+        updated_serie, count = change_series_day_of_week(serie_id, new_day)
+        if not updated_serie:
+            await query.answer("Errore durante l'aggiornamento.", show_alert=True)
+            return
+
+        escaped_title = html.escape(updated_serie.title)
+        new_day_name = DAYS_NAME[updated_serie.day_of_week]
+        time_str = updated_serie.default_event_time.strftime("%H:%M")
+
+        next_event = get_next_actual_event(updated_serie.id)
+        if next_event:
+            next_dt_str = next_event.event_datetime.strftime("%d/%m/%Y alle %H:%M")
+            next_info = f"🗓️ <b>Prossimo appuntamento:</b> <code>{next_dt_str}</code>"
+        else:
+            next_info = "🗓️ <b>Prossimo appuntamento:</b> Nessuno programmato"
+
+        text = (
+            f"✅ <b>Giorno della serie aggiornato!</b>\n\n"
+            f"La serie <b>{escaped_title}</b> ora è programmata per ogni <b>{new_day_name}</b> alle <code>{time_str}</code>.\n\n"
+            f"{next_info}"
+        )
+
+        buttons = [
+            [InlineKeyboardButton("⚙️ Gestione serie", callback_data=f"manage_serie:{updated_serie.id}:{new_day}")],
+            [InlineKeyboardButton("📅 Torna al palinsesto", callback_data=f"show_day:{new_day}")],
+        ]
+
+        await query.answer(text=f"Serie spostata a {new_day_name}!", show_alert=False)
         await edit_ephemeral_view(context, query, chat_id, user_tg.id, text, InlineKeyboardMarkup(buttons))
         return
 

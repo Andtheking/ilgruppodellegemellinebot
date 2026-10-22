@@ -86,3 +86,42 @@ def delete_or_unlink_series(serie_id: int, chat_id: int) -> Tuple[str, str]:
             SharedEventSerie.delete().where(SharedEventSerie.event_serie == serie).execute()
             serie.delete_instance()
         return "deleted", title
+
+
+def change_series_day_of_week(serie_id: int, new_day_of_week: int) -> Tuple[Optional[EventSerie], int]:
+    """_Changes the recurring day of the week for an event series and regenerates future pending actual events._
+
+    Args:
+        serie_id (int): _The ID of the event series._
+        new_day_of_week (int): _The new day of the week (0=Monday, 6=Sunday)._
+
+    Returns:
+        Tuple[Optional[EventSerie], int]: _A tuple containing the updated EventSerie (or None if not found) and the number of recreated events._
+    """
+    serie = EventSerie.get_or_none(EventSerie.id == serie_id)
+    if not serie:
+        return None, 0
+
+    now = datetime.datetime.now()
+
+    with db.atomic():
+        serie.day_of_week = new_day_of_week
+        serie.save(only=[EventSerie.day_of_week])
+
+        # Delete all pending and future skipped events
+        (
+            ActualEvent
+            .delete()
+            .where(
+                (ActualEvent.event_serie == serie) &
+                (
+                    (ActualEvent.status == 'PENDING') |
+                    ((ActualEvent.status == 'SKIPPED') & (ActualEvent.event_datetime >= now))
+                )
+            )
+            .execute()
+        )
+
+        events_created = populate_rolling_events_for_series(serie)
+
+    return serie, events_created

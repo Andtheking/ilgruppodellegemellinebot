@@ -283,3 +283,131 @@ def test_search_active_series_for_chat():
 
     all_active = search_active_series_for_chat(chat.id)
     assert len(all_active) == 2
+
+
+def test_change_series_day_of_week_basic():
+    """Verify that changing a series day updates day_of_week and regenerates pending events."""
+    from services.eventseries_manager import change_series_day_of_week
+    chat = Chat.create(id=801, title="Day Change Chat")
+    today = datetime.date.today()
+    initial_day = 0  # Monday
+    new_day = 3      # Thursday
+
+    series = EventSerie.create(
+        chat=chat,
+        title="Day Change Test",
+        default_event_time=datetime.time(21, 00),
+        default_remind_time=datetime.time(20, 00),
+        day_of_week=initial_day,
+        start_date=today,
+        end_date=None,
+        is_active=True
+    )
+    populate_rolling_events_for_series(series)
+
+    # All initial events should be Monday (0)
+    initial_events = list(ActualEvent.select().where(ActualEvent.event_serie == series))
+    assert len(initial_events) > 0
+    for ev in initial_events:
+        assert ev.event_datetime.weekday() == initial_day
+
+    # Change day to Thursday (3)
+    updated_serie, count = change_series_day_of_week(series.id, new_day)
+    assert updated_serie is not None
+    assert updated_serie.day_of_week == new_day
+    assert count > 0
+
+    new_events = list(ActualEvent.select().where(ActualEvent.event_serie == series))
+    assert len(new_events) == count
+    for ev in new_events:
+        assert ev.event_datetime.weekday() == new_day
+        assert ev.status == 'PENDING'
+
+
+def test_change_series_day_of_week_preserves_past_events():
+    """Verify that past SENT events are kept intact when shifting days."""
+    from services.eventseries_manager import change_series_day_of_week
+    chat = Chat.create(id=802, title="Preserve Past Chat")
+    today = datetime.date.today()
+
+    series = EventSerie.create(
+        chat=chat,
+        title="History Test",
+        default_event_time=datetime.time(21, 00),
+        default_remind_time=datetime.time(20, 00),
+        day_of_week=1, # Tuesday
+        start_date=today - datetime.timedelta(days=30),
+        end_date=None,
+        is_active=True
+    )
+
+    # Insert a past sent event
+    past_dt = datetime.datetime.now() - datetime.timedelta(days=7)
+    past_event = ActualEvent.create(
+        event_serie=series,
+        event_datetime=past_dt,
+        remind_datetime=past_dt - datetime.timedelta(hours=1),
+        status='SENT'
+    )
+
+    populate_rolling_events_for_series(series)
+
+    # Shift to Friday (4)
+    updated_serie, count = change_series_day_of_week(series.id, 4)
+    assert updated_serie is not None
+    assert count > 0
+
+    # Past event still exists
+    assert ActualEvent.get_or_none(ActualEvent.id == past_event.id) is not None
+    assert ActualEvent.get_by_id(past_event.id).status == 'SENT'
+
+    # Future events are Friday
+    future_events = list(ActualEvent.select().where(
+        (ActualEvent.event_serie == series) & (ActualEvent.status == 'PENDING')
+    ))
+    for ev in future_events:
+        assert ev.event_datetime.weekday() == 4
+
+
+def test_change_series_day_of_week_removes_future_skipped():
+    """Verify that future skipped events on the old day are cleaned up."""
+    from services.eventseries_manager import change_series_day_of_week
+    chat = Chat.create(id=803, title="Skipped Cleanup Chat")
+    today = datetime.date.today()
+
+    series = EventSerie.create(
+        chat=chat,
+        title="Skipped Clean Test",
+        default_event_time=datetime.time(21, 00),
+        default_remind_time=datetime.time(20, 00),
+        day_of_week=2, # Wednesday
+        start_date=today,
+        end_date=None,
+        is_active=True
+    )
+    populate_rolling_events_for_series(series)
+
+    # Mark the first pending event as SKIPPED
+    first_event = ActualEvent.select().where(ActualEvent.event_serie == series).order_by(ActualEvent.event_datetime.asc()).first()
+    first_event.status = 'SKIPPED'
+    first_event.save()
+
+    # Change day to Saturday (5)
+    updated_serie, count = change_series_day_of_week(series.id, 5)
+    assert updated_serie is not None
+
+    # The skipped event on Wednesday should be gone
+    assert ActualEvent.select().where(ActualEvent.status == 'SKIPPED').count() == 0
+
+    # All current events should be PENDING on Saturday
+    for ev in ActualEvent.select().where(ActualEvent.event_serie == series):
+        assert ev.status == 'PENDING'
+        assert ev.event_datetime.weekday() == 5
+
+
+def test_change_series_day_of_week_non_existent():
+    """Non-existent series ID returns None and 0."""
+    from services.eventseries_manager import change_series_day_of_week
+    serie, count = change_series_day_of_week(999999, 1)
+    assert serie is None
+    assert count == 0

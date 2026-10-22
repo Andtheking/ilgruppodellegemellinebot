@@ -35,7 +35,7 @@ def populate_rolling_events_for_series(series: EventSerie, weeks_ahead: int = DE
 
     if last_event_dt:
         # start from last actual event + 1
-        start_search_date = last_event_dt.date() + datetime.timedelta(days=1)
+        start_search_date = max(last_event_dt.date() + datetime.timedelta(days=1), today)
     else: 
         # it's the first event
         start_search_date = max(series.start_date, today)

@@ -101,7 +101,7 @@ def start_bot():
         "forceSub": CustomCommandHandler("force_sub", other='(?P<args>.+)?', callback=middleware(force_sub_command)),
         "forceUnsub": CustomCommandHandler("force_unsub", other='(?P<args>.+)?', callback=middleware(force_unsub_command)),
         "forceSubPick": CallbackQueryHandler(force_sub_pick_callback, pattern=r"^(force_sub_pick|force_unsub_pick):"),
-        "subCallback": CallbackQueryHandler(middleware(subscription_callback_handler), pattern=r"^(show_day|toggle_sub|manage_serie|confirm_skip|do_skip|confirm_del|do_del|manage_subs|force_unsub_btn):"),
+        "subCallback": CallbackQueryHandler(middleware(subscription_callback_handler), pattern=r"^(show_day|toggle_sub|manage_serie|confirm_skip|do_skip|confirm_del|do_del|manage_subs|force_unsub_btn|change_day_menu|noop_curr_day|confirm_change_day|do_change_day):"),
         "setAnilist": CustomCommandHandler("set_anilist", other="(?P<profile>.+)", callback=middleware(set_anilist_command)),
         "share_callback": CallbackQueryHandler(share_link_callback, pattern=r"^share_link:",),
     }
